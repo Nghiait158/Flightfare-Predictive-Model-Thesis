@@ -1,9 +1,9 @@
 {
   "departure_airport": "SGN",
-  "arrival_airport": "TBB",
+  "arrival_airport": "HAN",
   "search_options": {
     "trip_type": "oneway",
-    "find_cheapest": true,
-    "departure_date": "today"
+    "departure_date": "15/06/2025",
+    "find_cheapest": true
   }
 } 

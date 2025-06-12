@@ -1,0 +1,9 @@
+{
+  "departure_airport": "SGN",
+  "arrival_airport": "TBB",
+  "search_options": {
+    "trip_type": "oneway",
+    "find_cheapest": true,
+    "departure_date": "today"
+  }
+} 

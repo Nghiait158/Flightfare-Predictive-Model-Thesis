@@ -3,7 +3,7 @@ import path from 'path';
 import puppeteer from 'puppeteer';
 
 const url = 'https://www.vietjetair.com/vi/pages/bao-hiem-du-lich-sky-care-1681121104781';
-
+// test github
 // Đọc thông tin sân bay từ CSV
 function readAirportsFromCSV(filePath) {
     const csvContent = fs.readFileSync(filePath, 'utf-8');

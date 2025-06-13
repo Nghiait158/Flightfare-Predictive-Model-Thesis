@@ -1,6 +1,6 @@
 {
   "departure_airport": "SGN",
-  "arrival_airport": "HAN",
+  "arrival_airport": "DLI",
   "search_options": {
     "trip_type": "oneway",
     "departure_date": "15/06/2025",

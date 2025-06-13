@@ -24,6 +24,7 @@ export const CRAWLER_DATA_SCRIPT = path.join(BASE_DIR, 'src', 'crawler_data.js')
  * Output directory paths
  */
 export const SCREENSHOT_DIR = path.join(BASE_DIR, 'screenshot');
+export const RESULT_DIR = path.join(BASE_DIR, 'result');
 
 /**
  * Output file paths

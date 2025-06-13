@@ -14,7 +14,7 @@ import { SCREENSHOT_DIR } from '../constants/paths.js';
  */
 export function readCSVFile(filePath) {
     try {
-        console.log(`📖 Reading CSV file: ${path.basename(filePath)}`);
+        // console.log(`Reading CSV file: ${path.basename(filePath)}`);
         
         if (!fs.existsSync(filePath)) {
             throw new Error(`CSV file not found: ${filePath}`);
@@ -24,7 +24,7 @@ export function readCSVFile(filePath) {
         const lines = csvContent.trim().split('\n');
         
         if (lines.length === 0) {
-            throw new Error('CSV file is empty');
+            throw new Error('CSV file is empty:');    
         }
         
         const headers = lines[0].split(',').map(h => h.trim());
@@ -41,14 +41,14 @@ export function readCSVFile(filePath) {
             data.push(row);
         }
         
-        console.log(`✅ Successfully read ${data.length} records from CSV: ${path.basename(filePath)}`);
+        console.log(`Read ${data.length} records from CSV: ${path.basename(filePath)}`);
         return data;
         
     } catch (error) {
         console.error(`❌ Error reading CSV file ${filePath}:`, error.message);
         throw new Error(`Failed to read CSV file: ${error.message}`);
     }
-}
+}  
 
 /**
  * Reads and parses a JSON file
@@ -58,7 +58,7 @@ export function readCSVFile(filePath) {
  */
 export function readJSONFile(filePath) {
     try {
-        console.log(`📖 Reading JSON file: ${path.basename(filePath)}`);
+        // console.log(`📖 Reading JSON file: ${path.basename(filePath)}`);
         
         if (!fs.existsSync(filePath)) {
             throw new Error(`JSON file not found: ${filePath}`);
@@ -67,7 +67,7 @@ export function readJSONFile(filePath) {
         const jsonContent = fs.readFileSync(filePath, 'utf-8');
         const data = JSON.parse(jsonContent);
         
-        console.log(`✅ Successfully read JSON file: ${path.basename(filePath)}`);
+        console.log(`Read JSON file: ${path.basename(filePath)}`);
         return data;
         
     } catch (error) {
@@ -112,7 +112,7 @@ export function writeJSONFile(data, filePath, pretty = true) {
  */
 export function clearDirectory(directoryPath) {
     try {
-        console.log(`🗑️ Clearing directory: ${path.basename(directoryPath)}`);
+        // console.log(`Clearing directory: ${path.basename(directoryPath)}`);
         
         if (fs.existsSync(directoryPath)) {
             const files = fs.readdirSync(directoryPath);
@@ -129,13 +129,13 @@ export function clearDirectory(directoryPath) {
             }
             
             if (deletedCount > 0) {
-                console.log(`🗑️ Cleared ${deletedCount} files from directory: ${path.basename(directoryPath)}`);
+                console.log(`Cleared ${deletedCount} files from directory: ${path.basename(directoryPath)}`);
             } else {
-                console.log(`ℹ️ Directory already empty: ${path.basename(directoryPath)}`);
+                console.log(`Directory already empty: ${path.basename(directoryPath)}`);
             }
         } else {
             fs.mkdirSync(directoryPath, { recursive: true });
-            console.log(`📁 Created directory: ${path.basename(directoryPath)}`);
+            console.log(`Created directory: ${path.basename(directoryPath)}`);
         }
         
     } catch (error) {
@@ -197,4 +197,49 @@ export function readScriptFile(filePath) {
  */
 export function initializeScreenshotDirectory() {
     clearDirectory(SCREENSHOT_DIR);
+}
+
+/**
+ * Appends data to a JSON file. If the file doesn't exist, it's created.
+ * Assumes the root of the JSON file is an array.
+ * @param {string} filePath - Path to the JSON file.
+ * @param {Object} dataToAppend - The new data object to add to the array.
+ */
+export function appendToJsonFile(filePath, dataToAppend) {
+    try {
+        let existingData = [];
+        
+        // Ensure directory exists
+        const directory = path.dirname(filePath);
+        if (!fs.existsSync(directory)) {
+            fs.mkdirSync(directory, { recursive: true });
+            console.log(`📁 Created directory: ${directory}`);
+        }
+
+        if (fs.existsSync(filePath)) {
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            // Avoid parsing empty files
+            if (fileContent) {
+                try {
+                    existingData = JSON.parse(fileContent);
+                } catch (parseError) {
+                    console.error(`❌ Error parsing existing JSON file at ${filePath}. It will be overwritten.`, parseError);
+                    existingData = [];
+                }
+            }
+        }
+        
+        // Ensure the existing data is an array
+        if (!Array.isArray(existingData)) {
+            console.warn(`File at ${filePath} does not contain a JSON array. Overwriting with new data.`);
+            existingData = [];
+        }
+
+        existingData.push(dataToAppend);
+
+        fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2), 'utf-8');
+        console.log(`✅ Data appended to ${filePath}`);
+    } catch (error) {
+        console.error(`❌ Failed to append to JSON file at ${filePath}:`, error);
+    }
 } 

@@ -32,22 +32,24 @@ import { getTimestampedScreenshotPath } from '../constants/paths.js';
  */
 export async function launchBrowser() {
     try {
-        console.log('🚀 Launching browser...');
         
         const browser = await puppeteer.launch({
-            headless: BROWSER_CONFIG.HEADLESS,
+            headless: BROWSER_CONFIG.HEADLESS, //false
             args: BROWSER_CONFIG.ARGS,
-            defaultViewport: BROWSER_CONFIG.DEFAULT_VIEWPORT,
-        });
+            defaultViewport: BROWSER_CONFIG.DEFAULT_VIEWPORT, //null 
 
+        });
+        
         const page = await browser.newPage();
+
+        await page.setUserAgent(BROWSER_CONFIG.USER_AGENT); 
         await page.setViewport({ 
-            width: BROWSER_CONFIG.VIEWPORT_WIDTH, 
+            width: BROWSER_CONFIG.VIEWPORT_WIDTH, //1920x1080
             height: BROWSER_CONFIG.VIEWPORT_HEIGHT 
         });
 
-        console.log(`✅ Browser launched successfully (headless: ${BROWSER_CONFIG.HEADLESS})`);
-        console.log(`📏 Viewport set to ${BROWSER_CONFIG.VIEWPORT_WIDTH}x${BROWSER_CONFIG.VIEWPORT_HEIGHT}`);
+        // console.log(`Browser launched successfully (headless: ${BROWSER_CONFIG.HEADLESS})`);
+        // console.log(`Viewport set to ${BROWSER_CONFIG.VIEWPORT_WIDTH}x${BROWSER_CONFIG.VIEWPORT_HEIGHT}`);
         
         return { browser, page };
         
@@ -144,15 +146,15 @@ export async function gotoPage(page, url, options = {}) {
     for (let attempt = 0; attempt <= retries; attempt++) {
         try {
             if (attempt > 0) {
-                console.log(`🔄 Navigation attempt ${attempt + 1}/${retries + 1} for ${url}`);
+                console.log(`Navigation attempt ${attempt + 1}/${retries + 1} for ${url}`);
                 await delay(DELAY_MEDIUM);
             }
             
             await page.goto(url, puppeteerOptions);
             
             const title = await page.title();
-            console.log(`🌍 Successfully navigated to: ${title}`);
-            console.log(`📍 URL: ${url}`);
+            console.log(`Navigated to: ${title}`);
+            // console.log(` URL: ${url}`);
             
             return;
             
@@ -177,7 +179,7 @@ export async function gotoPage(page, url, options = {}) {
  */
 export async function handleCookiePopups(page, context = '') {
     try {
-        console.log(`🍪 Checking for cookie popups... ${context}`);
+        // console.log(`🍪 Checking for cookie popups... ${context}`);
         
         const result = await page.evaluate((selectors) => {
             let status = { firstButton: false, cookieButton: false };
@@ -208,13 +210,13 @@ export async function handleCookiePopups(page, context = '') {
 
         // Log results
         if (result.firstButton) {
-            console.log(`✅ ${context}First button (NC_CTA_ONE) clicked`);
+            console.log(`${context}First button (NC_CTA_ONE) clicked`);
         }
         if (result.cookieButton) {
-            console.log(`✅ ${context}Cookie consent button clicked`);
+            console.log(`${context}Cookie consent button clicked`);
         }
         if (!result.firstButton && !result.cookieButton) {
-            console.log(`ℹ️ ${context}No cookie popups found or already handled`);
+            console.log(`${context}No cookie popups found or already handled`);
         }
         
         // Small delay to allow page to process clicks
@@ -343,7 +345,7 @@ export async function validatePageLoad(page) {
             return false;
         }
         
-        console.log(`✅ Page validation passed: "${title}"`);
+        console.log(`Page title: "${title}"`);
         return true;
         
     } catch (error) {

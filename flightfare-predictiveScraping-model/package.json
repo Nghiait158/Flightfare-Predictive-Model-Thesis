@@ -1,16 +1,16 @@
 {
-    "name": "my-crawler",
-    "version": "0.0.1",
+    "name": "flightfare-predictive-scraping-model",
+    "version": "1.0.0",
     "type": "module",
-    "description": "This is an example of a Crawlee project.",
+    "description": "Thesis Project",
     "dependencies": {
         "crawlee": "^3.0.0",
         "puppeteer": "*"
     },
     "scripts": {
         "start": "node src/main.js",
-        "test": "echo \"Error: oops, the actor has no tests yet, sad!\" && exit 1"
+        "test": "echo \"Error: no tests yet\" && exit 1"
     },
-    "author": "It's not you it's me",
+    "author": "Trinh Van Trung Nghia-ITITIU21254",
     "license": "ISC"
 }

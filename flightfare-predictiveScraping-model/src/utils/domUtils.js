@@ -36,7 +36,7 @@ export async function safeClick(page, selector, elementName, options = {}) {
     const finalOptions = { ...defaultOptions, ...options };
     
     try {
-        console.log(`🖱️ Attempting to click: ${elementName} (${selector})`);
+        // console.log(`Attempting to click: ${elementName} (${selector})`);
         
         // Wait for element if required
         if (finalOptions.waitForVisible) {
@@ -45,7 +45,6 @@ export async function safeClick(page, selector, elementName, options = {}) {
                 timeout: finalOptions.timeout 
             });
         }
-        
         // Check if element exists and is visible
         const element = await page.$(selector);
         if (!element) {
@@ -68,7 +67,7 @@ export async function safeClick(page, selector, elementName, options = {}) {
             await delay(finalOptions.delay);
         }
         
-        console.log(`✅ Successfully clicked: ${elementName}`);
+        console.log(`Clicked: ${elementName}`);
         return true;
         
     } catch (error) {
@@ -96,7 +95,7 @@ export async function typeText(page, selector, text, elementName, options = {}) 
     const finalOptions = { ...defaultOptions, ...options };
     
     try {
-        console.log(`⌨️ Typing into ${elementName}: "${text}"`);
+        // console.log(`Typing into ${elementName}: "${text}"`);
         
         // Wait for element
         await page.waitForSelector(selector, { 
@@ -130,7 +129,7 @@ export async function typeText(page, selector, text, elementName, options = {}) 
             }
         }, selector);
         
-        console.log(`✅ Successfully typed into ${elementName}`);
+        console.log(`Typed into ${elementName}: "${text}`);
         return true;
         
     } catch (error) {

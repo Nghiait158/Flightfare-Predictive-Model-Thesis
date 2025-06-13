@@ -21,7 +21,7 @@ import {
 
 // Constants and paths
 import { SCREENSHOT_DIR } from './constants/paths.js';
-import { delay } from './constants/constants.js';
+import { BROWSER_CONFIG, delay } from './constants/constants.js';
 
 /**
  * @typedef {Object} ExecutionResult
@@ -61,59 +61,69 @@ async function main(options = {}) {
         // Header
         console.log('Thesis Trinh Van Trung Nghia');
         console.log('============================================');
-        console.log(`⏰ Started at: ${new Date().toISOString()}`);
-
-        console.log(`🗂️ Clear screenshots: ${clearScreenshots}\n`);
+        // console.log(`⏰ Started at: ${new Date().toISOString()}`);
+        console.log(`Started at: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`);
+        // console.log(`Clear screenshots: ${clearScreenshots}\n`);
         // Xóa screen shot
         if (clearScreenshots) {
             try {
                 clearDirectory(SCREENSHOT_DIR);
-                console.log('Screenshots directory cleared successfully\n');
+                // console.log('Screenshots cleared\n');
             } catch (error) {
-                console.warn(`⚠️ Failed to clear screenshots directory: ${error.message}`);
-                console.log('⚠️ Continuing with existing files...\n');
+                console.warn(`Failed to clear screenshots directory: ${error.message}`);
+                console.log('Continuing with existing files...\n');
             }
         } else {
             console.log('Skipping screenshots directory cleanup\n');
         }
+        console.log('');
 
-        // Step 2: Load flight configuration and airports
-        console.log('Loading flight configuration and airports...');
+//---------------------------------------------Load flight configuration and airports------------------------------------------------ 
+// ------------------------------------------Xác định cấu hình cho chuyến bay và sân bay
+
+        console.log('📋 Loading flight configuration and airports');
+        
         const config = await loadFlightConfig();
         
-        console.log(`✅ Configuration loaded successfully:`);
-        console.log(`   • ${config.airports.length} airports available`);
+        console.log(`Configuration loaded :`);
+        // console.log(`   • ${config.airports.length} airports available`);
         console.log(`   • Route: ${config.flightConfig.departure_airport} → ${config.flightConfig.arrival_airport}`);
         console.log(`   • Departure: ${config.departureAirport.city} (${config.departureAirport.airport_name})`);
         console.log(`   • Arrival: ${config.arrivalAirport.city} (${config.arrivalAirport.airport_name})`);
         console.log(`   • Search options: ${JSON.stringify(config.flightConfig.search_options, null, 2)}\n`);
 
-        // Step 3: Validate crawler configuration
-        console.log('📋 Step 3: Validating crawler configuration...');
+// ------------------------------------------------Step 3: Xác thưc cấu hình cho crawler------------------------------------------------
+        console.log('📋 Validating crawler configuration...');
         validateCrawlerConfig({
             flightConfig: config.flightConfig,
             airports: config.airports
         });
         console.log('');
+        // process.exit();
 
-        // Step 4: Launch browser
-        console.log('📋 Step 4: Launching browser...');
+
+// ------------------------------------------------Launch browser(Khởi động website)------------------------------------------------
+        console.log('📋 Launching browser...');
         const browserResult = await launchBrowser();
         browser = browserResult.browser;
         page = browserResult.page;
         
-        console.log('✅ Browser launched successfully');
+        console.log('Browser launched with:');
+        console.log(`   • Headless: ${BROWSER_CONFIG.HEADLESS}`)
         console.log(`   • Browser instance: ${browser ? 'Active' : 'Failed'}`);
         console.log(`   • Page instance: ${page ? 'Active' : 'Failed'}`);
         console.log(`   • Viewport: ${JSON.stringify(await page.viewport())}\n`);
+        // process.exit();
 
-        // Step 5: Setup browser logging (handled in crawlerService, but we can enable early)
-        console.log('📋 Step 5: Setting up browser logging...');
+// ------------------------------------------------Setup browser logging (show log từ trang web)------------------------------------------------
+        console.log('📋 Setting up browser logging...');
         setupBrowserLogging(page);
         console.log('✅ Browser logging configured\n');
 
-        // Step 6: Run main crawler
-        console.log('📋 Step 6: Starting main crawler execution...');
+
+// -------------------------------------------------Run main crawler-------------------------------------------------
+        
+        console.log('📋Starting main crawler execution...');
         console.log('=' .repeat(50));
 
         let crawlerResult;
@@ -178,7 +188,7 @@ async function main(options = {}) {
         executionResult.totalDuration = Date.now() - startTime;
 
         if (crawlerResult.success) {
-            console.log('\n🎉 Main execution completed successfully!');
+            console.log('\n🎉 Main execution completed !');
             console.log('==========================================');
             console.log(`⏱️ Total execution time: ${(executionResult.totalDuration / 1000).toFixed(2)} seconds`);
             console.log(`📸 Total screenshots: ${crawlerResult.screenshots.length}`);
@@ -224,7 +234,7 @@ async function main(options = {}) {
         if (browser) {
             try {
                 await closeBrowser(browser);
-                console.log('✅ Browser closed successfully');
+                console.log('✅ Browser closed ');
             } catch (closeError) {
                 console.error(`⚠️ Error closing browser: ${closeError.message}`);
             }
@@ -241,7 +251,7 @@ async function main(options = {}) {
         console.log(`⏰ Completed at: ${new Date().toISOString()}`);
         
         if (executionResult.success && executionResult.crawlerResult) {
-            console.log(`🎯 Crawling success: ✅`);
+            console.log(` Crawling success: ✅`);
             console.log(`📊 Results obtained: ${executionResult.crawlerResult.results ? '✅' : '❌'}`);
         }
         
@@ -261,25 +271,25 @@ async function entryPoint() {
     };
 
     // Display startup information
-    console.log('🚀 VietJet Flight Crawler Starting...');
-    console.log('=====================================');
+    // console.log('🚀 VietJet Flight Crawler Starting...');
+    // console.log('=====================================');
     
     if (args.length > 0) {
-        console.log('📝 Command line arguments detected:');
+        console.log('Command line arguments detected:');
         args.forEach(arg => console.log(`   • ${arg}`));
     }
     
-    console.log(`🔧 Options:`);
-    console.log(`   • Use retry: ${options.useRetry}`);
-    console.log(`   • Clear screenshots: ${options.clearScreenshots}`);
-    console.log('');
+    // console.log(`Options:`);
+    // console.log(`   • Use retry: ${options.useRetry}`);
+    // console.log(`   • Clear screenshots: ${options.clearScreenshots}`);
+    // console.log('');
 
     try {
         const result = await main(options);
         
         // Exit with appropriate code
         if (result.success) {
-            console.log('🎉 Process completed successfully - exiting with code 0');
+            console.log('🎉 Process completed  - exiting with code 0');
             process.exit(0);
             } else {
             console.log('❌ Process completed with errors - exiting with code 1');

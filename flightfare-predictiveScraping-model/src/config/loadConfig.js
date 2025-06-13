@@ -36,6 +36,8 @@ import { AIRPORTS_CSV_PATH, FLIGHT_CONFIG_PATH } from '../constants/paths.js';
  * @param {Object} config - Configuration object to validate
  * @throws {Error} If required fields are missing or invalid
  */
+
+
 function validateFlightConfigStructure(config) {
     const requiredFields = ['departure_airport', 'arrival_airport'];
     const missingFields = [];
@@ -74,6 +76,7 @@ function validateFlightConfigStructure(config) {
  * @throws {Error} If airport data is invalid
  */
 function validateAirportsData(airports) {
+    
     if (!Array.isArray(airports) || airports.length === 0) {
         throw new Error('Airports data must be a non-empty array');
     }
@@ -148,27 +151,31 @@ function validateAirportAvailability(flightConfig, airports) {
  */
 export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configPath = FLIGHT_CONFIG_PATH) {
     try {
-        console.log('📖 Loading flight configuration and airports data...');
+        // console.log('Loading flight configuration and airports data...');
 
         // Load airports data
-        console.log('📊 Loading airports database...');
+        // console.log('Loading airports database...');
+
         const airports = readCSVFile(airportsPath);
+
         validateAirportsData(airports);
-        console.log(`✅ Loaded ${airports.length} airports from database`);
+
+        // console.log(`Loaded ${airports.length} airports from database`);
 
         // Load flight configuration
-        console.log('⚙️ Loading flight configuration...');
+        // console.log('Loading flight configuration...');
+        
         const flightConfig = readJSONFile(configPath);
         validateFlightConfigStructure(flightConfig);
-        console.log(`✅ Flight configuration loaded: ${flightConfig.departure_airport} → ${flightConfig.arrival_airport}`);
+        console.log(`Flight configuration loaded: ${flightConfig.departure_airport} → ${flightConfig.arrival_airport}`);
 
         // Validate airport availability
-        console.log('🔍 Validating airport availability...');
+        // console.log('🔍 Validating airport availability...');
         const { departureAirport, arrivalAirport } = validateAirportAvailability(flightConfig, airports);
         
-        console.log(`✅ Departure: ${departureAirport.city} (${departureAirport.code}) - ${departureAirport.airport_name}`);
-        console.log(`✅ Arrival: ${arrivalAirport.city} (${arrivalAirport.code}) - ${arrivalAirport.airport_name}`);
-        console.log(`✅ Search options: ${JSON.stringify(flightConfig.search_options, null, 2)}`);
+        // console.log(`✅ Departure: ${departureAirport.city} (${departureAirport.code}) - ${departureAirport.airport_name}`);
+        // console.log(`✅ Arrival: ${arrivalAirport.city} (${arrivalAirport.code}) - ${arrivalAirport.airport_name}`);
+        // console.log(`✅ Search options: ${JSON.stringify(flightConfig.search_options, null, 2)}`);
         // Set default values for search options if not provided
         const defaultSearchOptions = {
             trip_type: 'oneway',
@@ -176,6 +183,7 @@ export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configP
             departure_date: 'today'
         };
 
+        // Nếu mà không có config trc thì mặc định như bên trên 
         const finalConfig = {
             ...flightConfig,
             search_options: {
@@ -184,7 +192,7 @@ export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configP
             }
         };
 
-        console.log('🎯 Configuration validation completed successfully!');
+        // console.log('Configuration validation completed!');
 
         return {
             flightConfig: finalConfig,

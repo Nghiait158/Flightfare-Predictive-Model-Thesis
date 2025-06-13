@@ -3,6 +3,7 @@
  */
 
 import { delay, DELAY_MEDIUM, DELAY_LONG } from '../constants/constants.js';
+
 import { 
     gotoPage, 
     handleCookiePopups, 
@@ -10,14 +11,16 @@ import {
     setupBrowserLogging,
     validatePageLoad 
 } from '../utils/browserUtils.js';
+
+
 import { 
+    performFlightSearch_VietJet,
     selectDepartureAirport,
     selectArrivalAirport,
     selectFlightDate,
     submitSearchForm,
-    getFlightResults,
-    performFlightSearch
-} from '../services/flightService.js';
+    getFlightResults
+} from '../services/flightService_VietJet.js';
 
 /**
  * @typedef {Object} CrawlerConfig
@@ -70,20 +73,18 @@ export async function runCrawler(page, { flightConfig, airports }) {
     };
 
     try {
-        console.log('🚀 Starting VietJet Flight Crawler');
-        console.log('==================================');
-        console.log(`📍 Route: ${result.route}`);
-        console.log(`⏰ Start time: ${result.metadata.startTime}`);
-        console.log(`🌐 Target URL: ${VIETJET_URL}\n`);
+        // console.log(`📍 Route: ${result.route}`);
+        // console.log(`⏰ Start time: ${result.metadata.startTime}`);
+        console.log(`Target  : ${VIETJET_URL}\n`);
 
-        // Step 1: Setup browser logging
-        console.log('📋 Step 1: Setting up browser logging...');
+        console.log('📋 Setting up browser logging...');
+        // set up return log
         setupBrowserLogging(page);
         steps.push('Browser logging configured');
         console.log('✅ Browser logging configured\n');
-
+// ----------------------------------------------------------------------------------------------------
         // Step 2: Navigate to VietJet page
-        console.log('📋 Step 2: Navigating to VietJet website...');
+        console.log('📋 Navigating to target website...');
         await gotoPage(page, VIETJET_URL, {
             waitUntil: 'networkidle2',
             timeout: 30000
@@ -96,35 +97,34 @@ export async function runCrawler(page, { flightConfig, airports }) {
         }
         
         steps.push('Navigation completed');
-        console.log('✅ Successfully navigated to VietJet\n');
-
-        // Step 3: Take initial screenshot
-        console.log('📋 Step 3: Taking initial screenshot...');
+// --------------------------------------------------------------------------------------------------------
+        // Take initial screenshot
         const initialScreenshot = await takeScreenshot(page, 'crawler-initial-page');
         screenshots.push(initialScreenshot);
         steps.push('Initial screenshot captured');
-        console.log('✅ Initial screenshot captured\n');
 
-        // Step 4: Handle cookie popups
-        console.log('📋 Step 4: Handling cookie popups and consent dialogs...');
+// ---------------------------------------------------------------------------------------------------
+        // Handle cookie popups
+        console.log('Handling cookie popups and consent dialogs...');
         const cookieResult = await handleCookiePopups(page, 'Main crawler: ');
         
         if (cookieResult.firstButton || cookieResult.cookieButton) {
-            console.log('✅ Cookie popups handled successfully');
+            console.log('Cookie popups handled successfully');
             await delay(DELAY_MEDIUM);
             
             // Take screenshot after cookie handling
             const cookieScreenshot = await takeScreenshot(page, 'crawler-after-cookies');
             screenshots.push(cookieScreenshot);
         } else {
-            console.log('ℹ️ No cookie popups found');
+            console.log('No cookie popups found');
         }
         
         steps.push('Cookie handling completed');
         console.log('');
 
-        // Step 5: Get airport information
-        console.log('📋 Step 5: Resolving airport information...');
+
+// -----------------------------------------------------------------------------------------------------------
+        // Get airport information
         const departureAirport = airports.find(ap => ap.code === flightConfig.departure_airport);
         const arrivalAirport = airports.find(ap => ap.code === flightConfig.arrival_airport);
 
@@ -141,11 +141,12 @@ export async function runCrawler(page, { flightConfig, airports }) {
         steps.push('Airport information resolved');
         console.log('');
 
-        // Step 6: Execute flight search workflow
-        console.log('📋 Step 6: Executing flight search workflow...');
-        console.log('⚡ Running complete flight search automation...\n');
-        
-        const searchResult = await performFlightSearch(
+// -------------------------------------------------------------------------------------------------------------------
+        // Execute flight search workflow
+        // console.log('Executing flight search workflow...');
+
+
+        const searchResult = await performFlightSearch_VietJet(
             page, 
             departureAirport, 
             arrivalAirport, 
@@ -156,7 +157,6 @@ export async function runCrawler(page, { flightConfig, airports }) {
             throw new Error(`Flight search failed: ${searchResult.error}`);
         }
 
-        console.log('✅ Flight search workflow completed successfully');
         steps.push('Flight search workflow executed');
         result.results = searchResult.results;
         console.log('');
@@ -252,6 +252,7 @@ export async function runCrawlerWithRetry(page, config, options = {}) {
 
     while (attempt <= maxRetries) {
         try {
+            // Nếu lần thứ 2 retry:
             if (attempt > 0) {
                 console.log(`\n🔄 Retry attempt ${attempt}/${maxRetries}`);
                 console.log('================================');
@@ -286,6 +287,8 @@ export async function runCrawlerWithRetry(page, config, options = {}) {
  * @param {CrawlerConfig} config - Configuration to validate
  * @throws {Error} If configuration is invalid
  */
+
+// Xác thực các sân bay, điều kiện cho các sân bay
 export function validateCrawlerConfig(config) {
     if (!config) {
         throw new Error('Crawler configuration is required');
@@ -320,7 +323,7 @@ export function validateCrawlerConfig(config) {
         throw new Error('Departure and arrival airports cannot be the same');
     }
 
-    console.log('✅ Crawler configuration validated successfully');
+    console.log('Crawler configuration validated');
 }
 
 /**

@@ -16,6 +16,10 @@ import {
     getElementText,
     isElementVisible
 } from '../utils/domUtils.js';
+import { log } from 'console';
+import { crawlData_from_VietJetPage } from './crawlData_VietJet.js';
+import { appendToJsonFile } from '../utils/fileUtils.js';
+import { RESULT_DIR } from '../constants/paths.js';
 
 /**
  * @typedef {Object} Airport
@@ -43,7 +47,7 @@ import {
  */
 export async function selectDepartureAirport(page, departureAirport) {
     try {
-        console.log(`🛫 Selecting departure airport: ${departureAirport.city} (${departureAirport.code})`);
+        console.log(`Selecting departure airport: ${departureAirport.city} (${departureAirport.code})`);
         
         // Click vào input field sân bay đi
         const departureInputClicked = await safeClick(
@@ -70,10 +74,10 @@ export async function selectDepartureAirport(page, departureAirport) {
             throw new Error('Failed to type departure airport code');
         }
         
-        console.log('✅ Departure airport code typed successfully');
+        // console.log('Departure airport code typed successfully');
         await delay(DELAY_MEDIUM); // Đợi dropdown xuất hiện
         
-        // Wait for Vietnam panel using Puppeteer native methods
+        // Wait for Vietnam panel using Puppeteer native methods( chờ Panel VietNam xuất hiện để click vào airport)
         await page.waitForSelector('.MuiExpansionPanel-root', { timeout: 10000 });
         await delay(DELAY_SHORT);
         
@@ -108,7 +112,7 @@ export async function selectDepartureAirport(page, departureAirport) {
         if (selected) {
             // Kiểm tra giá trị input sau khi chọn
             const inputValue = await page.$eval(SELECTORS.AIRPORTS.DEPARTURE_INPUT_FIELD, el => el.value);
-            console.log(`✅ Departure airport selected. Input value: "${inputValue}"`);
+            console.log(`Departure airport selected. Input value: "${inputValue}"`);
             return true;
         } else {
             throw new Error(`Could not select departure airport: ${departureAirport.city}`);
@@ -128,7 +132,7 @@ export async function selectDepartureAirport(page, departureAirport) {
  */
 export async function selectArrivalAirport(page, arrivalAirport) {
     try {
-        console.log(`🛬 Selecting arrival airport: ${arrivalAirport.city} (${arrivalAirport.code})`);
+        console.log(`Selecting arrival airport: ${arrivalAirport.city} (${arrivalAirport.code})`);
         
         // Click vào input field sân bay đến
         const arrivalInputClicked = await safeClick(
@@ -155,7 +159,7 @@ export async function selectArrivalAirport(page, arrivalAirport) {
             throw new Error('Failed to type arrival airport code');
         }
         
-        console.log('✅ Arrival airport code typed successfully');
+        console.log('Arrival airport code typed successfully');
         await delay(DELAY_MEDIUM); // Đợi dropdown xuất hiện
         
         // Wait for arrival dropdown using Puppeteer native methods
@@ -193,7 +197,7 @@ export async function selectArrivalAirport(page, arrivalAirport) {
         if (selected) {
             // Kiểm tra giá trị input sau khi chọn
             const inputValue = await page.$eval(SELECTORS.AIRPORTS.ARRIVAL_INPUT, el => el.value);
-            console.log(`✅ Arrival airport selected. Input value: "${inputValue}"`);
+            console.log(`Arrival airport selected. Input value: "${inputValue}"`);
             return true;
         } else {
             console.log(`⚠️ Could not select arrival airport from dropdown, using typed value as fallback`);
@@ -249,6 +253,7 @@ async function selectAirportFromDropdown(page, airport, type) {
         
         const airportList = [];
         
+        // List ra những airport có tại VietNam panel  
         for (let index = 0; index < allBoxes.length; index++) {
             const box = allBoxes[index];
             try {
@@ -270,26 +275,28 @@ async function selectAirportFromDropdown(page, airport, type) {
             }
         }
 
-        console.log(`${type} airports found:`, airportList.length);
-
         // Find target airport
+        // lấy code, tên sân bay, thành phố 
         const targetAirport = airportList.find(ap => 
             ap.hasCode || ap.hasCity || ap.hasAirportName
         );
         
         if (targetAirport) {
-            console.log(`🎯 Found ${type} airport ${airport.city} at index ${targetAirport.index}. Attempting to click...`);
+            console.log(`Found ${type} airport ${airport.city} at index ${targetAirport.index}. Attempting to click...`);
             
             const airportElement = targetAirport.element;
             
-            // Scroll to element using Puppeteer
             try {
+                // kéo xuống để nhìn 
                 await airportElement.scrollIntoView();
                 await delay(DELAY_SHORT);
             } catch (error) {
                 console.log('⚠️ Could not scroll to element:', error.message);
             }
             
+
+            // Chọn sân bay phía dưới dropdown vì khi input trưc tiếp vào field
+            // sẽ không nhận đặc thù của VietJet
             // Multiple Puppeteer click attempts
             let clicked = false;
             
@@ -297,7 +304,7 @@ async function selectAirportFromDropdown(page, airport, type) {
             try {
                 await airportElement.click();
                 clicked = true;
-                console.log(`✅ Method 1: Puppeteer direct click successful for ${type} airport`);
+                console.log(`Method 1: Puppeteer direct click successful for ${type} airport`);
             } catch (error) {
                 console.log(`⚠️ Method 1 failed: ${error.message}`);
             }
@@ -341,7 +348,7 @@ async function selectAirportFromDropdown(page, airport, type) {
             }
             
             if (clicked) {
-                console.log(`✅ Successfully clicked ${type} airport: ${airport.city}`);
+                console.log(`Clicked ${type} airport: ${airport.city}`);
                 await delay(DELAY_MEDIUM);
                 return true;
             }
@@ -365,7 +372,6 @@ async function selectAirportFromDropdown(page, airport, type) {
  */
 export async function selectFlightDate(page, dateString = null, returnDateString = null) {
     try {
-        console.log('📅 Selecting flight date...');
         
         // Click vào nút "Ngày đi"
         const dateButtonClicked = await safeClick(
@@ -390,7 +396,7 @@ export async function selectFlightDate(page, dateString = null, returnDateString
             );
             
             if (todaySelected) {
-                console.log('✅ Today\'s date selected successfully');
+                console.log('Today\'s date selected successfully');
             } else {
                 throw new Error('Failed to select today\'s date');
             }
@@ -400,7 +406,7 @@ export async function selectFlightDate(page, dateString = null, returnDateString
             if (!specificDateSelected) {
                 throw new Error(`Failed to select departure date: ${dateString}`);
             }
-            console.log(`✅ Departure date selected: ${dateString}`);
+            console.log(`Departure date selected: ${dateString}`);
         }
         
         await delay(DELAY_MEDIUM);
@@ -457,9 +463,6 @@ async function selectSpecificDate(page, dateString, type = 'departure') {
         if (isNaN(targetDate.getTime())) {
             throw new Error(`Invalid date format: ${dateString}. Use DD/MM/YYYY format`);
         }
-        
-        console.log(`🎯 Target date: ${targetDate.toDateString()}`);
-        
         // Wait for calendar to be visible
         await page.waitForSelector('.rdrCalendarWrapper, .MuiPickersCalendar-root, .react-datepicker', { timeout: 10000 });
         await delay(DELAY_SHORT);
@@ -768,7 +771,7 @@ async function navigateToMonth(page, targetDate) {
  */
 export async function selectTripType(page, tripType = 'oneway') {
     try {
-        console.log(`🎫 Selecting trip type: ${tripType}`);
+        console.log(`Selecting trip type: ${tripType}`);
         
         // Select trip type radio button
         if (tripType === 'roundtrip') {
@@ -780,7 +783,7 @@ export async function selectTripType(page, tripType = 'oneway') {
             );
             
             if (roundtripSelected) {
-                console.log('✅ Round-trip radio button selected');
+                console.log('Round-trip radio button selected');
                 await delay(DELAY_MEDIUM); // Allow form to adjust
                 return true;
             } else {
@@ -796,7 +799,7 @@ export async function selectTripType(page, tripType = 'oneway') {
             );
             
             if (onewaySelected) {
-                console.log('✅ One-way radio button selected');
+                // console.log('One-way radio button selected');
                 await delay(DELAY_SHORT);
                 return true;
             } else {
@@ -819,8 +822,6 @@ export async function selectTripType(page, tripType = 'oneway') {
  */
 export async function submitSearchForm(page, tripType = 'oneway') {
     try {
-        console.log('🔍 Submitting flight search form...');
-        
         // Click cheapest ticket checkbox (if available)
         const cheapestSelected = await safeClick(
             page, 
@@ -846,7 +847,6 @@ export async function submitSearchForm(page, tripType = 'oneway') {
         
         if (searchButtonClicked) {
             console.log('✅ Search form submitted successfully');
-            console.log('⏳ Waiting for results...');
             await delay(10000); // Wait for results to load
             return true;
         } else {
@@ -862,21 +862,28 @@ export async function submitSearchForm(page, tripType = 'oneway') {
 /**
  * Gets flight results using crawler script injection or fallback methods
  * @param {import('puppeteer').Page} page - Puppeteer page instance
+ * @param {string} dateString - The date of the flight search
  * @returns {Promise<Object|null>} Flight results object or null if failed
  */
-export async function getFlightResults(page) {
+export async function getFlightResults(page, dateString, departure_airport, arrival_airport) {
     try {
-        console.log('📊 Getting flight results...');
+        console.log('Starting Crawling flight ticket');
         
-        // Method 1: Try to inject crawler_data.js script
-        const scriptResults = await injectCrawlerScript(page);
-        if (scriptResults) {
-            console.log('✅ Results obtained via script injection');
+        const scriptResults = await executeCrawlerScript(page, dateString, departure_airport, arrival_airport);
+        
+        // Check if the crawler script returned valid results with prices
+        if (scriptResults && scriptResults.prices && scriptResults.prices.length > 0) {
+            console.log('✅ Results obtained via crawler script');
+
+            // Save results to the historical data file
+            const historyFilePath = path.join(RESULT_DIR, 'flight_price_history.json');
+            appendToJsonFile(historyFilePath, scriptResults);
+
             return scriptResults;
         }
         
-        // Method 2: Fallback to manual data extraction
-        console.log('🔄 Falling back to manual result extraction...');
+        // Fallback methods if crawler script fails or returns no prices
+        console.log('🔄 Crawler script did not return prices, falling back to manual extraction...');
         const manualResults = await extractResultsManually(page);
         if (manualResults) {
             console.log('✅ Results obtained via manual extraction');
@@ -896,52 +903,31 @@ export async function getFlightResults(page) {
 /**
  * Injects crawler_data.js script and gets results
  * @param {import('puppeteer').Page} page - Puppeteer page instance
+ * @param {string} dateString - The date of the flight search
  * @returns {Promise<Object|null>} Results from injected script
  */
-async function injectCrawlerScript(page) {
+async function executeCrawlerScript(page, dateString, departure_airport, arrival_airport) {
     try {
-        console.log('🔄 Injecting crawler_data.js into results page...');
+
+        console.log('Appeard page need to scraping');
         
-        // Read crawler_data.js file
-        const crawlerDataPath = path.join(process.cwd(), 'src', 'crawler_data.js');
+        await handleCookieConsent(page);
+        // Execute the imported crawler function in the page's context
+        const results = await page.evaluate(crawlData_from_VietJetPage, dateString, departure_airport, arrival_airport);
         
-        if (!fs.existsSync(crawlerDataPath)) {
-            console.warn('⚠️ crawler_data.js not found');
-            return null;
-        }
-        
-        const crawlerDataScript = fs.readFileSync(crawlerDataPath, 'utf-8');
-        
-        // Inject script into page
-        await page.evaluateOnNewDocument(crawlerDataScript);
-        await page.evaluate(crawlerDataScript);
-        
-        console.log('✅ Crawler data script injected successfully!');
-        
-        // Wait for script to complete
-        await delay(8000);
-        
-        // Get results from window.crawlerResults
-        const results = await page.evaluate(() => {
-            return window.crawlerResults || null;
-        });
-        
-        if (results) {
-            console.log('📊 Crawler results obtained:', Object.keys(results));
-            
-            // Save results to file
-            const resultsFile = path.join(SCREENSHOT_DIR, 'flight_results.json');
-            fs.writeFileSync(resultsFile, JSON.stringify(results, null, 2));
-            console.log(`💾 Results saved to: ${resultsFile}`);
-            
+        if (results && !results.error) {
+            console.log('Crawler script executed:', Object.keys(results));
             return results;
         } else {
-            console.log('⚠️ No results found from crawler script');
+            console.log('⚠️ No results found from crawler script or script returned an error.');
+            if(results && results.error) {
+                console.error('Crawler script error:', results.error);
+            }
             return null;
         }
         
     } catch (error) {
-        console.error('❌ Error injecting crawler script:', error.message);
+        console.error('❌ Error executing crawler script:', error.message);
         return null;
     }
 }
@@ -1062,6 +1048,55 @@ async function getBasicPageInfo(page) {
 }
 
 /**
+ * Handles cookie consent popups on the page.
+ * @param {import('puppeteer').Page} page - Puppeteer page instance
+ * @returns {Promise<void>}
+ */
+async function handleCookieConsent(page) {
+    try {
+       await delay(DELAY_MEDIUM); // Wait for popups to appear
+
+        // This function will be executed in the browser context
+        const popupsHandled = await page.evaluate(() => {
+            let handled = false;
+            // First possible popup
+            const btn = document.getElementById('NC_CTA_ONE');
+            if (btn) {
+                btn.click();
+                console.log('✅ First cookie button clicked');
+                handled = true;
+            }
+
+            // Second possible popup
+            const muiButton = document.evaluate(
+                "//button[contains(@class, 'MuiButton-root')]//h5[contains(text(), 'Đồng ý')]/..",
+                document,
+                null,
+                XPathResult.FIRST_ORDERED_NODE_TYPE,
+                null
+            ).singleNodeValue;
+
+            if (muiButton) {
+                muiButton.click();
+                console.log('✅ Second cookie button (MUI) clicked');
+                handled = true;
+            }
+            
+            return handled;
+        });
+
+        if (popupsHandled) {
+            console.log('✅ Cookie consent handled.');
+            await delay(DELAY_SHORT);
+        } else {
+            console.log('ℹ️ No cookie popups found or handled.');
+        }
+    } catch (error) {
+        console.warn(`⚠️ Could not handle cookie consent: ${error.message}`);
+    }
+}
+
+/**
  * Performs complete flight search workflow
  * @param {import('puppeteer').Page} page - Puppeteer page instance
  * @param {Airport} departureAirport - Departure airport information
@@ -1072,7 +1107,7 @@ async function getBasicPageInfo(page) {
  * @param {string} [searchOptions.trip_type='oneway'] - Trip type: 'oneway' or 'roundtrip'
  * @returns {Promise<FlightSearchResult>} Complete search result
  */
-export async function performFlightSearch(page, departureAirport, arrivalAirport, searchOptions = {}) {
+export async function performFlightSearch_VietJet(page, departureAirport, arrivalAirport, searchOptions = {}) {
     const {
         departure_date = 'today',
         return_date = null,
@@ -1091,17 +1126,23 @@ export async function performFlightSearch(page, departureAirport, arrivalAirport
     };
     
     try {
-        console.log(`🚀 Starting flight search: ${departureAirport.city} → ${arrivalAirport.city}`);
-        console.log(`📅 Departure: ${departure_date}, Return: ${return_date || 'N/A'}, Type: ${trip_type}`);
+        console.log(`Starting flight search: ${departureAirport.city} → ${arrivalAirport.city}`);
+        console.log(`Departure: ${departure_date}, Return: ${return_date || 'N/A'}, Type: ${trip_type}`);
+        console.log('');
         
-        // Step 1: Select trip type first (affects form layout)
-        console.log('🎫 Setting trip type...');
+        // Handle cookie consent first
+        await handleCookieConsent(page);
+        
+// -----------------------------Select trip type first (để ko ảnh hưởng tới lúc chọn ngày)-----------------------------------------------
+        // console.log('Setting trip type...');
         const tripTypeSelected = await selectTripType(page, trip_type);
         if (!tripTypeSelected) {
             console.warn('⚠️ Could not select trip type, continuing with default');
         }
+        console.log('');
         
-        // Step 2: Select departure airport
+//------------------------------Select departure airport(sân bay đi )-----------------------------------------------------    
+        
         const departureSelected = await selectDepartureAirport(page, departureAirport);
         if (!departureSelected) {
             throw new Error('Failed to select departure airport');
@@ -1126,7 +1167,7 @@ export async function performFlightSearch(page, departureAirport, arrivalAirport
         }
         
         // Step 5: Get flight results
-        const results = await getFlightResults(page);
+        const results = await getFlightResults(page, departure_date, departureAirport,arrivalAirport );
         
         searchResult.success = true;
         searchResult.results = results;

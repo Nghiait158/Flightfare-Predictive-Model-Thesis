@@ -4,6 +4,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createObjectCsvWriter } from 'csv-writer';
 import { SCREENSHOT_DIR } from '../constants/paths.js';
 
 /**
@@ -242,4 +243,52 @@ export function appendToJsonFile(filePath, dataToAppend) {
     } catch (error) {
         console.error(`❌ Failed to append to JSON file at ${filePath}:`, error);
     }
-} 
+}
+
+/**
+ * Appends data to a CSV file.
+ * Creates the file and adds headers if it doesn't exist.
+ * @param {string} filePath - Path to the CSV file
+ * @param {Array<Object>} records - Array of records to append
+ */
+export async function appendToCsvFile(filePath, records) {
+    try {
+        const fileExists = fs.existsSync(filePath);
+        
+        // Ensure directory exists
+        const directory = path.dirname(filePath);
+        if (!fs.existsSync(directory)) {
+            fs.mkdirSync(directory, { recursive: true });
+            console.log(`📁 Created directory: ${directory}`);
+        }
+
+        const csvWriter = createObjectCsvWriter({
+            path: filePath,
+            header: [
+                { id: 'created_at', title: 'created_at' },
+                { id: 'flight_number', title: 'flight_number' },
+                { id: 'departure_airport', title: 'departure_airport' },
+                { id: 'arrival_airport', title: 'arrival_airport' },
+                { id: 'flight_date', title: 'flight_date' },
+                { id: 'departure_time', title: 'departure_time' },
+                { id: 'arrival_time', title: 'arrival_time' },
+                { id: 'classes', title: 'classes' },
+                { id: 'price', title: 'price' },
+            ],
+            append: fileExists,
+            writeHeaders: !fileExists
+        });
+        const currentTime = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        
+        const recordsWithTimestamp = records.map(record => ({
+            created_at: currentTime,
+            ...record
+        }));
+
+        await csvWriter.writeRecords(recordsWithTimestamp);
+        
+        console.log(`✅ Data appended to ${path.basename(filePath)}`);
+    } catch (error) {
+        console.error(`❌ Error writing to CSV file:`, error);
+    }
+}

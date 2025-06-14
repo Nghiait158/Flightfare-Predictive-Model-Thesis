@@ -107,9 +107,23 @@ export function setupBrowserLogging(page) {
         });
 
         page.on('requestfailed', request => {
+            // Filter out noise from analytics, tracking, and measurement requests
+            const url = request.url();
+            const isNoisyRequest = 
+                url.includes('analytics') || 
+                url.includes('tracking') || 
+                url.includes('measurement') ||
+                url.includes('google-analytics') ||
+                url.includes('gtag') ||
+                url.includes('googletagmanager') ||
+                url.includes('facebook.com') ||
+                url.includes('doubleclick') ||
+                url.includes('ads') ||
+                url.includes('conversion');
+            
             // Only log significant request failures
-            if (!request.url().includes('analytics') && !request.url().includes('tracking')) {
-                console.warn(`🌐 Request Failed: ${request.method()} ${request.url()}`);
+            if (!isNoisyRequest) {
+                console.warn(`🌐 Request Failed: ${request.method()} ${url}`);
             }
         });
 

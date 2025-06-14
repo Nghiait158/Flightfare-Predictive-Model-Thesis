@@ -194,8 +194,7 @@ export function crawlData_from_VietJetPage(dateString, departure_airport, arriva
                             // departure_airport: departureAirport,
                             // arrival_airport: arrivalAirport,
                             // Thay thế hoặc thêm trường 'date' với định dạng dd/mm/yyyy
-                            date: formattedDate, // Đây là trường mới bạn muốn có
-                            // Các trường cũ nếu bạn vẫn muốn giữ chúng:
+                            date: formattedDate, 
                             // day: day.padStart(2, '0'),
                             // month: month,
                             // year: year,

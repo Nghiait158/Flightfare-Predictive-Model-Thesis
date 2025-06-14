@@ -18,8 +18,27 @@ import {
 } from '../utils/domUtils.js';
 import { log } from 'console';
 import { crawlData_from_VietJetPage } from './crawlData_VietJet.js';
-import { appendToJsonFile } from '../utils/fileUtils.js';
-import { RESULT_DIR } from '../constants/paths.js';
+import { crawlData_byDate_from_VietJetPage } from './crawlData_byDate_from_VietJetPage.js';
+import { appendToJsonFile, appendToCsvFile } from '../utils/fileUtils.js';
+import { RESULT_DIR, FLIGHT_CONFIG_PATH } from '../constants/paths.js';
+
+/**
+ * Reads flight configuration from config file
+ * @returns {Promise<Object>} Flight configuration object
+ */
+async function readFlightConfig() {
+    try {
+        const configData = await fs.promises.readFile(FLIGHT_CONFIG_PATH, 'utf8');
+        return JSON.parse(configData);
+    } catch (error) {
+        console.warn('⚠️ Could not read flight config, using defaults:', error.message);
+        return {
+            search_options: {
+                find_cheapest: false
+            }
+        };
+    }
+}
 
 /**
  * @typedef {Object} Airport
@@ -822,18 +841,27 @@ export async function selectTripType(page, tripType = 'oneway') {
  */
 export async function submitSearchForm(page, tripType = 'oneway') {
     try {
-        // Click cheapest ticket checkbox (if available)
-        const cheapestSelected = await safeClick(
-            page, 
-            SELECTORS.SEARCH.CHEAPEST_CHECKBOX, 
-            'Find cheapest ticket checkbox',
-            { timeout: 5000 }
-        );
+        // Read flight configuration
+        const config = await readFlightConfig();
+        const shouldFindCheapest = config.search_options?.find_cheapest || false;
         
-        if (cheapestSelected) {
-            console.log('✅ Cheapest ticket option selected');
+        // Click cheapest ticket checkbox only if configured to do so
+        if (shouldFindCheapest) {
+            console.log('🎯 Attempting to select cheapest ticket option (enabled in config)...');
+            const cheapestSelected = await safeClick(
+                page, 
+                SELECTORS.SEARCH.CHEAPEST_CHECKBOX, 
+                'Find cheapest ticket checkbox',
+                { timeout: 5000 }
+            );
+            
+            if (cheapestSelected) {
+                console.log('✅ Cheapest ticket option selected');
+            } else {
+                console.log('ℹ️ Cheapest ticket checkbox not found or already selected');
+            }
         } else {
-            console.log('ℹ️ Cheapest ticket checkbox not found or already selected');
+            console.log('ℹ️ Cheapest ticket option disabled in config, skipping...');
         }
         
         await delay(DELAY_SHORT);
@@ -872,12 +900,39 @@ export async function getFlightResults(page, dateString, departure_airport, arri
         const scriptResults = await executeCrawlerScript(page, dateString, departure_airport, arrival_airport);
         
         // Check if the crawler script returned valid results with prices
-        if (scriptResults && scriptResults.prices && scriptResults.prices.length > 0) {
+        let allPrices = [];
+        
+        // Handle results from crawlData_byDate_from_VietJetPage (has daily_results structure)
+        if (scriptResults && scriptResults.daily_results && scriptResults.daily_results.length > 0) {
+            // Flatten all prices from all days
+            allPrices = scriptResults.daily_results.flatMap(day => day.prices || []);
+        }
+        // Handle results from other crawlers (has direct prices structure)  
+        else if (scriptResults && scriptResults.prices && scriptResults.prices.length > 0) {
+            allPrices = scriptResults.prices;
+        }
+        
+        if (allPrices.length > 0) {
             console.log('✅ Results obtained via crawler script');
+            console.log(`📊 Found ${allPrices.length} price records`);
 
             // Save results to the historical data file
             const historyFilePath = path.join(RESULT_DIR, 'flight_price_history.json');
             appendToJsonFile(historyFilePath, scriptResults);
+
+            // Save results to CSV file
+            const csvFilePath = path.join(RESULT_DIR, 'flight_price_history.csv');
+            const csvRecords = allPrices.map(flight => ({
+                flight_number: flight.flight_number,
+                departure_airport: flight.departure_airport,
+                arrival_airport: flight.arrival_airport,
+                flight_date: flight.flight_date || flight.departure_date || dateString,
+                departure_time: flight.departure_time,
+                arrival_time: flight.arrival_time,
+                classes: flight.classes,
+                price: flight.total_price,
+            }));
+            await appendToCsvFile(csvFilePath, csvRecords);
 
             return scriptResults;
         }
@@ -912,9 +967,16 @@ async function executeCrawlerScript(page, dateString, departure_airport, arrival
         console.log('Appeard page need to scraping');
         
         await handleCookieConsent(page);
+
+        await handleStickClose(page);
+
         // Execute the imported crawler function in the page's context
-        const results = await page.evaluate(crawlData_from_VietJetPage, dateString, departure_airport, arrival_airport);
-        
+
+        // Execute the imported crawler function in the page's context
+        // const results = await page.evaluate(crawlData_from_VietJetPage, dateString, departure_airport, arrival_airport);
+       
+
+        const results = await crawlData_byDate_from_VietJetPage(page, dateString, departure_airport, arrival_airport);
         if (results && !results.error) {
             console.log('Crawler script executed:', Object.keys(results));
             return results;
@@ -929,6 +991,17 @@ async function executeCrawlerScript(page, dateString, departure_airport, arrival
     } catch (error) {
         console.error('❌ Error executing crawler script:', error.message);
         return null;
+    }
+}
+async function handleStickClose(page) {
+
+    try {
+        await page.waitForSelector('button[aria-label="close"]', { 
+            visible: true, 
+            timeout: 5000 
+        });
+    } catch (error) {
+        console.error('❌ Cant click button:', error.message);
     }
 }
 

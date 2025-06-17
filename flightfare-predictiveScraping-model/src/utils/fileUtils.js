@@ -267,6 +267,7 @@ export async function appendToCsvFile(filePath, records) {
             header: [
                 { id: 'created_at', title: 'created_at' },
                 { id: 'flight_number', title: 'flight_number' },
+                { id: 'aircraft_type', title: 'aircraft_type' },
                 { id: 'departure_airport', title: 'departure_airport' },
                 { id: 'arrival_airport', title: 'arrival_airport' },
                 { id: 'flight_date', title: 'flight_date' },
@@ -278,7 +279,7 @@ export async function appendToCsvFile(filePath, records) {
             append: fileExists,
             writeHeaders: !fileExists
         });
-        const currentTime = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const currentTime = new Date().toISOString(); 
         
         const recordsWithTimestamp = records.map(record => ({
             created_at: currentTime,

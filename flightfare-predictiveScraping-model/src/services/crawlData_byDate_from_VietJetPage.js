@@ -25,8 +25,8 @@ function findClickablePriceOptions() {
             const p1Text = p1.textContent.trim();
             const p2Text = p2.textContent.trim();
 
-            // Check if the text content matches the price pattern (e.g., "1,290" and "000 VND").
-            if (/^[\d,]+$/.test(p1Text) && p2Text.includes('VND')) {
+            // Check if the text content matches the price pattern (e.g., "1,290" and "000 ").
+            if (/^[\d,]+$/.test(p1Text) && p2Text.includes('')) {
                 // The parent of this div is the actual clickable element.
                 const clickableContainer = div.parentElement;
                 
@@ -61,9 +61,9 @@ function extractBookingDetails(departure_airport, arrival_airport) {
     // Find total price by looking for the "Tổng tiền" label.
     const h4Elements = bookingInfoContainer.querySelectorAll('h4');
     for (const h4 of h4Elements) {
-        if (h4.textContent.trim() === 'Tổng tiền') {
+        if (h4.textContent.trim().includes('Tổng tiền')) {
             const priceEl = h4.nextElementSibling;
-            if (priceEl && priceEl.textContent.trim() !== '0 VND') {
+            if (priceEl && priceEl.textContent.trim() !== '0 ') {
                 total_price = priceEl.textContent.trim();
                 break;
             }
@@ -71,9 +71,9 @@ function extractBookingDetails(departure_airport, arrival_airport) {
     }
     
     // Fallback: If "Tổng tiền" is 0 or not found, try getting the price from the "Chuyến đi" section.
-    if (!total_price || total_price === '0 VND') {
+    if (!total_price || total_price === '0 ') {
         const tripPriceEl = Array.from(bookingInfoContainer.querySelectorAll('h4')).find(el => 
-            el.textContent.includes('VND') && 
+            el.textContent.includes('') && 
             el.previousElementSibling && 
             el.previousElementSibling.textContent.includes('Chuyến đi')
         );
@@ -81,7 +81,7 @@ function extractBookingDetails(departure_airport, arrival_airport) {
     }
     
     // If no valid price is found, abort.
-    if (!total_price || total_price === '0 VND') return null;
+    if (!total_price || total_price === '0') return null;
 
     let flight_number = null, departure_time = null, arrival_time = null, classes = null;
 
@@ -98,6 +98,16 @@ function extractBookingDetails(departure_airport, arrival_airport) {
     const classMatch = detailsText.match(/(Skyboss|Business|Deluxe|Eco)/);
     if (classMatch) classes = classMatch[1];
     
+    // Clean price: remove commas and VND
+    let cleaned_price = null;
+    if (total_price) {
+        cleaned_price = total_price
+            .replace(/,/g, '') // Remove commas
+            .replace(/\s*VND\s*/g, '') // Remove VND and surrounding spaces
+            .replace(/\s*₫\s*/g, '') // Remove Vietnamese dong symbol if present
+            .trim();
+    }
+    
     return {
         flight_number,
         departure_airport: departure_airport.code,
@@ -105,7 +115,7 @@ function extractBookingDetails(departure_airport, arrival_airport) {
         departure_time,
         arrival_time,
         classes,
-        price: total_price
+        total_price: cleaned_price
     };
 }
 
@@ -125,6 +135,54 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
     const startDay = parseInt(parts[0]);
     const startMonth = parseInt(parts[1]) - 1; // Month is 0-indexed in Date
     const startYear = parseInt(parts[2]);
+    
+    // Build a map of flight numbers to aircraft types from the main list.
+    const aircraftTypeMap = await page.evaluate(() => {
+        const flightAircraftMap = {};
+        // Find all spans that look like flight numbers. This is a stable starting point.
+        const flightSpans = Array.from(document.querySelectorAll('span')).filter(s => s.textContent.trim().match(/^VJ\d{3,4}$/));
+
+        flightSpans.forEach(flightSpan => {
+            const flightNumber = flightSpan.textContent.trim();
+            let aircraftType = null;
+            
+            // Heuristic to find the container for a single flight's info.
+            // We traverse up the DOM tree from the flight number span until we find an element
+            // that also contains the text "Bay thẳng" (Direct Flight), which is a reliable
+            // marker for a flight row in Vietjet's UI. We limit the search to 8 levels up
+            // to prevent scanning the entire page.
+            let current = flightSpan;
+            let container = null;
+            for (let i = 0; i < 8; i++) {
+                if (!current.parentElement) break;
+                current = current.parentElement;
+                const text = current.textContent || '';
+                // Check if the container has both the flight number and the direct flight marker.
+                if (text.includes('Bay thẳng') && text.includes(flightNumber)) {
+                    container = current;
+                    break;
+                }
+            }
+
+            if (container) {
+                // Once we have the flight container, we find a span within it that looks like an
+                // aircraft type (e.g., starts with "Airbus" or "Boeing").
+                const spansInContainer = Array.from(container.querySelectorAll('span'));
+                const aircraftSpan = spansInContainer.find(s => /^(Airbus|Boeing)/i.test(s.textContent.trim()));
+                if (aircraftSpan) {
+                    // Extract only the aircraft name, removing extra text like "- Bay thẳng"
+                    aircraftType = aircraftSpan.textContent.trim().split('-')[0].trim();
+                }
+            }
+            
+            if (flightNumber && aircraftType) {
+                flightAircraftMap[flightNumber] = aircraftType;
+            }
+        });
+        return flightAircraftMap;
+    });
+
+    console.log('✈️ Aircraft Type Map:', aircraftTypeMap);
     
     const startDate = new Date(startYear, startMonth, startDay);
     const currentMonth = startDate.getMonth();
@@ -241,7 +299,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             await new Promise(resolve => setTimeout(resolve, DELAY_SHORT)); 
 
             // Extract comprehensive flight data including the clicked price
-            const flightData = await page.evaluate((departure_airport, arrival_airport, clickedPrice) => {
+            const flightData = await page.evaluate((departure_airport, arrival_airport, clickedPrice, aircraftTypeMap) => {
                 // The booking info is consistently in the 4th column of the main grid
                 const bookingInfoContainer = document.querySelector('div.MuiGrid-grid-md-4');
                 if (!bookingInfoContainer) return null;
@@ -250,9 +308,9 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                 let total_price = null;
                 const h4Elements = bookingInfoContainer.querySelectorAll('h4');
                 for (const h4 of h4Elements) {
-                    if (h4.textContent.trim() === 'Tổng tiền') {
+                    if (h4.textContent.trim().includes('Tổng tiền')) {
                         const priceEl = h4.nextElementSibling;
-                        if (priceEl && priceEl.textContent.trim() !== '0 VND') {
+                        if (priceEl && priceEl.textContent.trim() !== '0') {
                             total_price = priceEl.textContent.trim();
                             break;
                         }
@@ -260,9 +318,9 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                 }
                 
                 // Fallback: If "Tổng tiền" is 0 or not found, try getting the price from the "Chuyến đi" section
-                if (!total_price || total_price === '0 VND') {
+                if (!total_price || total_price === '0 ') {
                     const tripPriceEl = Array.from(bookingInfoContainer.querySelectorAll('h4')).find(el => 
-                        el.textContent.includes('VND') && 
+                        el.textContent.includes('') && 
                         el.previousElementSibling && 
                         el.previousElementSibling.textContent.includes('Chuyến đi')
                     );
@@ -270,7 +328,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                 }
                 
                 // If no valid total price is found, abort
-                if (!total_price || total_price === '0 VND') return null;
+                if (!total_price || total_price === '0 ') return null;
 
                 // Extract detailed flight information
                 let flight_number = null;
@@ -278,12 +336,18 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                 let arrival_time = null;
                 let classes = null;
                 let departure_date = null;
+                let aircraft_type = null;
 
                 const detailsText = bookingInfoContainer.textContent;
                 
                 // Extract flight number (VJxxxx)
                 const flightMatch = detailsText.match(/(VJ\d+)/);
                 if (flightMatch) flight_number = flightMatch[1];
+
+                // Look up aircraft type from the map
+                if (flight_number && aircraftTypeMap[flight_number]) {
+                    aircraft_type = aircraftTypeMap[flight_number];
+                }
 
                 // Extract departure and arrival times (HH:MM - HH:MM)
                 const timeMatch = detailsText.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
@@ -326,22 +390,46 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                 );
                 if (serviceFeeEl) service_fee = serviceFeeEl.textContent.trim();
 
+                // Convert flight_date to ISO string
+                let iso_flight_date = null;
+                if (departure_date) {
+                    const dateParts = departure_date.split('/');
+                    if (dateParts.length === 3) {
+                        const day = parseInt(dateParts[0]);
+                        const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed in Date
+                        const year = parseInt(dateParts[2]);
+                        const dateObj = new Date(year, month, day);
+                        iso_flight_date = dateObj.toISOString();
+                    }
+                }
+
+                // Clean price: remove commas and VND
+                let cleaned_price = null;
+                if (total_price) {
+                    cleaned_price = total_price
+                        .replace(/,/g, '') // Remove commas
+                        .replace(/\s*VND\s*/g, '') // Remove VND and surrounding spaces
+                        .replace(/\s*₫\s*/g, '') // Remove Vietnamese dong symbol if present
+                        .trim();
+                }
+
                 return {
                     flight_number,
                     departure_airport: departure_airport.code,
                     arrival_airport: arrival_airport.code,
-                    flight_date: departure_date,
+                    flight_date: iso_flight_date,
                     departure_date,
                     departure_time,
                     arrival_time,
-                    total_price,
+                    total_price: cleaned_price,
                     classes,
+                    aircraft_type,
                     // ticket_price,
                     // tax_fee,
                     // service_fee,
                     // clicked_price: clickedPrice // Price from the clicked element
                 };
-            }, departure_airport, arrival_airport, priceInfo.clickedPrice);
+            }, departure_airport, arrival_airport, priceInfo.clickedPrice, aircraftTypeMap);
             
             if (flightData && flightData.total_price) {
                 // console.log("✅ EXTRACTED COMPREHENSIVE DATA:", JSON.stringify(flightData, null, 2));

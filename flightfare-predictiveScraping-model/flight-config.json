@@ -3,7 +3,7 @@
   "arrival_airport": "HAN",
   "search_options": {
     "trip_type": "oneway",
-    "departure_date": "29/08/2025",
-    "find_cheapest": false 
+    "find_cheapest": false,
+    "departure_date": "17/09/2025"
   }
-} 
+}

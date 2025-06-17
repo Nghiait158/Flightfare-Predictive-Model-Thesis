@@ -915,7 +915,8 @@ export async function getFlightResults(page, dateString, departure_airport, arri
         if (allPrices.length > 0) {
             console.log('✅ Results obtained via crawler script');
             console.log(`📊 Found ${allPrices.length} price records`);
-
+            console.log(`dateString`);
+            
             // Save results to the historical data file
             const historyFilePath = path.join(RESULT_DIR, 'flight_price_history.json');
             appendToJsonFile(historyFilePath, scriptResults);
@@ -930,6 +931,7 @@ export async function getFlightResults(page, dateString, departure_airport, arri
                 departure_time: flight.departure_time,
                 arrival_time: flight.arrival_time,
                 classes: flight.classes,
+                aircraft_type: flight.aircraft_type,
                 price: flight.total_price,
             }));
             await appendToCsvFile(csvFilePath, csvRecords);

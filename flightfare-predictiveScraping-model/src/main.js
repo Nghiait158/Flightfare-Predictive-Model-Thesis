@@ -7,9 +7,10 @@
 import { clearDirectory } from './utils/fileUtils.js';
 import { loadFlightConfig } from './config/loadConfig.js';
 import { 
+    //getBrowser,
+    closeBrowser,
     launchBrowser, 
     setupBrowserLogging, 
-    closeBrowser,
     takeScreenshot 
 } from './utils/browserUtils.js';
 import { 
@@ -18,10 +19,15 @@ import {
     validateCrawlerConfig, 
     getCrawlerStats 
 } from './services/crawlerService.js';
+import fs from 'fs';
 
 // Constants and paths
-import { SCREENSHOT_DIR } from './constants/paths.js';
+import { SCREENSHOT_DIR, FLIGHT_CONFIG_PATH, RESULT_DIR } from './constants/paths.js';
 import { BROWSER_CONFIG, delay } from './constants/constants.js';
+
+// App-level constants
+const MAX_RETRIES = 3;
+const BASE_URL = 'https://www.vietjetair.com/vi';
 
 /**
  * @typedef {Object} ExecutionResult
@@ -31,6 +37,31 @@ import { BROWSER_CONFIG, delay } from './constants/constants.js';
  * @property {number} totalDuration - Total execution time
  * @property {string} [error] - Error message if failed
  */
+
+/**
+ * Increments the departure date in the flight configuration by one month.
+ * @param {object} jsonData - The flight configuration object.
+ * @returns {object} The modified configuration object.
+ */
+function incrementDepartureMonth(jsonData) {
+    if (jsonData && jsonData.search_options && jsonData.search_options.departure_date) {
+        let [day, month, year] = jsonData.search_options.departure_date.split('/').map(Number);
+
+        month++; // Tăng tháng lên 1
+
+        if (month > 12) {
+            month = 1; // Đặt lại về tháng 1
+            year++;    // Tăng năm lên 1
+        }
+
+        // Định dạng lại ngày để đảm bảo các số có 2 chữ số (ví dụ: 01 thay vì 1)
+        const newDay = String(day).padStart(2, '0');
+        const newMonth = String(month).padStart(2, '0');
+
+        jsonData.search_options.departure_date = `${newDay}/${newMonth}/${year}`;
+    }
+    return jsonData;
+}
 
 /**
  * Main execution function
@@ -48,6 +79,7 @@ async function main(options = {}) {
     const startTime = Date.now();
     let browser = null;
     let page = null;
+    let config = null;
     
     const executionResult = {
         success: false,
@@ -83,7 +115,7 @@ async function main(options = {}) {
 
         console.log('📋 Loading flight configuration and airports');
         
-        const config = await loadFlightConfig();
+        config = await loadFlightConfig();
         
         console.log(`Configuration loaded :`);
         // console.log(`   • ${config.airports.length} airports available`);
@@ -104,7 +136,7 @@ async function main(options = {}) {
 
 // ------------------------------------------------Launch browser(Khởi động website)------------------------------------------------
         console.log('📋 Launching browser...');
-        const browserResult = await launchBrowser();
+        const browserResult = await launchBrowser(BASE_URL);
         browser = browserResult.browser;
         page = browserResult.page;
         
@@ -137,7 +169,7 @@ async function main(options = {}) {
                     airports: config.airports
                 },
                 {
-                    maxRetries: 2,
+                    maxRetries: MAX_RETRIES,
                     retryDelay: 5000
                 }
             );
@@ -241,7 +273,30 @@ async function main(options = {}) {
         } else {
             console.log('ℹ️ No browser instance to close');
         }
+// -------------Incr month in flight-config.json-------------
+        if (config && config.flightConfig) {
+            try {
+                console.log('\n📋 Calling incrementDepartureMonth before final exit...');
+                const originalDate = config.flightConfig.search_options.departure_date;
+                
+                // Cập nhật ngày khởi hành trong đối tượng config
+                incrementDepartureMonth(config.flightConfig);
+                
+                console.log(`   • Original departure date: ${originalDate}`);
+                console.log(`   • New departure date: ${config.flightConfig.search_options.departure_date}`);
+                
+                // Ghi lại cấu hình đã cập nhật vào tệp
+                await fs.promises.writeFile(FLIGHT_CONFIG_PATH, JSON.stringify(config.flightConfig, null, 2), 'utf8');
+                console.log(`   • Configuration saved to ${FLIGHT_CONFIG_PATH}`);
+            } catch (error) {
+                console.error('❌ Error updating and saving flight configuration:', error);
+            }
+        } else {
+            console.log('ℹ️ Flight configuration not available for month increment, skipping.');
+        }
+        await delay(10000);
 
+// ------------------------------------------------------------------
         // Final summary
         const finalDuration = (Date.now() - startTime) / 1000;
         console.log('\n🏁 Final Summary');

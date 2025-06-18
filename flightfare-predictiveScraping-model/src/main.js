@@ -260,6 +260,7 @@ async function main(options = {}) {
         return executionResult;
 
     } finally {
+         await delay(20000);
         // Step 8: Cleanup - Always ensure browser is closed
         console.log('\n📋 Step 8: Cleanup and resource management...');
         
@@ -294,7 +295,7 @@ async function main(options = {}) {
         } else {
             console.log('ℹ️ Flight configuration not available for month increment, skipping.');
         }
-        await delay(10000);
+        // await delay(20000);
 
 // ------------------------------------------------------------------
         // Final summary

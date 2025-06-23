@@ -1,4 +1,4 @@
-create_at,flight_number,departure_airport,arrival_airport,flight_date,departure_time,arrival_time,classes,price
+create_at,flight_number,aircraft_type,departure_airport,arrival_airport,flight_date,departure_time,arrival_time,classes,price
 2025-06-16T13:48:30.443Z,VJ1198,Airbus A321,SGN,HAN,2025-08-28T17:00:00.000Z,05:00,07:10,Skyboss,5000600
 2025-06-16T13:48:30.443Z,VJ1198,Airbus A321,SGN,HAN,2025-08-28T17:00:00.000Z,05:00,07:10,Deluxe,2732600
 2025-06-16T13:48:30.443Z,VJ1198,Airbus A321,SGN,HAN,2025-08-28T17:00:00.000Z,05:00,07:10,Eco,2138600

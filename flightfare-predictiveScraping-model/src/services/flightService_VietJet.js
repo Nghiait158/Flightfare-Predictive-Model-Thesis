@@ -923,17 +923,38 @@ export async function getFlightResults(page, dateString, departure_airport, arri
 
             // Save results to CSV file
             const csvFilePath = path.join(RESULT_DIR, 'flight_price_history.csv');
-            const csvRecords = allPrices.map(flight => ({
-                flight_number: flight.flight_number,
-                departure_airport: flight.departure_airport,
-                arrival_airport: flight.arrival_airport,
-                flight_date: flight.flight_date || flight.departure_date || dateString,
-                departure_time: flight.departure_time,
-                arrival_time: flight.arrival_time,
-                classes: flight.classes,
-                aircraft_type: flight.aircraft_type,
-                price: flight.total_price,
-            }));
+            const csvRecords = allPrices.map(flight => {
+                // Use flight_date from scraper (now reliable since it uses crawl date as primary source)
+                let flight_date_iso = flight.flight_date;
+                
+                // Only fallback to dateString conversion if scraper completely failed to provide date
+                if (!flight_date_iso && dateString) {
+                    try {
+                        const dateParts = dateString.split('/');
+                        if (dateParts.length === 3) {
+                            const day = parseInt(dateParts[0]);
+                            const month = parseInt(dateParts[1]) - 1;
+                            const year = parseInt(dateParts[2]);
+                            const dateObj = new Date(year, month, day);
+                            flight_date_iso = dateObj.toISOString();
+                        }
+                    } catch (error) {
+                        console.warn('Failed to convert dateString to ISO:', dateString);
+                    }
+                }
+
+                return {
+                    flight_number: flight.flight_number,
+                    departure_airport: flight.departure_airport,
+                    arrival_airport: flight.arrival_airport,
+                    flight_date: flight_date_iso, // Trust scraper's date processing
+                    departure_time: flight.departure_time,
+                    arrival_time: flight.arrival_time,
+                    classes: flight.classes,
+                    aircraft_type: flight.aircraft_type,
+                    price: flight.total_price,
+                };
+            });
             await appendToCsvFile(csvFilePath, csvRecords);
 
             return scriptResults;

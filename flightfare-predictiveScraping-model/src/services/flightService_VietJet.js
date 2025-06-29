@@ -1068,12 +1068,16 @@ async function executeCrawlerScript(page, dateString, departure_airport, arrival
 
         await handleStickClose(page);
 
-        // Execute the imported crawler function in the page's context
-
-        // Execute the imported crawler function in the page's context
-        // const results = await page.evaluate(crawlData_from_VietJetPage, dateString, departure_airport, arrival_airport);
+        // Scroll to bottom to load all content
        
 
+        // Execute scroll to bottom
+        await scrollToBottom(page);
+        
+        // Wait a bit for content to load after scrolling
+        await delay(DELAY_MEDIUM);
+
+        // Execute the imported crawler function in the page's context
         const results = await crawlData_byDate_from_VietJetPage(page, dateString, departure_airport, arrival_airport);
         if (results && !results.error) {
             console.log('Crawler script executed:', Object.keys(results));
@@ -1091,15 +1095,55 @@ async function executeCrawlerScript(page, dateString, departure_airport, arrival
         return null;
     }
 }
+async function scrollToBottom(page) {
+    console.log('🔄 Starting progressive scroll to bottom...');
+    
+    let previousHeight = 0;
+    let currentHeight = await page.evaluate(() => document.body.scrollHeight);
+    let scrollAttempts = 0;
+    const maxScrollAttempts = 20; // Giới hạn số lần scroll
+    
+    while (previousHeight !== currentHeight && scrollAttempts < maxScrollAttempts) {
+        previousHeight = currentHeight;
+        
+        // Scroll down by chunks
+        await page.evaluate(() => {
+            window.scrollBy(0, window.innerHeight);
+        });
+        
+        // Wait for content to load
+        await delay(1000);
+        
+        // Check new height
+        currentHeight = await page.evaluate(() => document.body.scrollHeight);
+        scrollAttempts++;
+        
+        console.log(`📍 Scroll attempt ${scrollAttempts}: ${previousHeight} → ${currentHeight}`);
+    }
+    
+    // Final scroll to absolute bottom
+    await page.evaluate(() => {
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+    
+    console.log(`✅ Completed scrolling to bottom after ${scrollAttempts} attempts.`);
+}
 async function handleStickClose(page) {
-
     try {
-        await page.waitForSelector('button[aria-label="close"]', { 
+        const closeButton = await page.waitForSelector('button[aria-label="close"]', { 
             visible: true, 
             timeout: 5000 
         });
+        
+        // Kiểm tra xem nút có tồn tại trước khi click không
+        if (closeButton) {
+            await closeButton.click();
+            console.log('✅ Clicked close button successfully!');
+        } else {
+            console.log('❌ Close button not found after waiting.');
+        }
     } catch (error) {
-        console.error('❌ Cant click button:', error.message);
+        console.error('❌ Error clicking close button:', error.message);
     }
 }
 

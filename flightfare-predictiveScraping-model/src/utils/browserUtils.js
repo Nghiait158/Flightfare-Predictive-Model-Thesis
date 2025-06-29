@@ -1,6 +1,3 @@
-/**
- * @fileoverview Browser utilities for Puppeteer operations
- */
 
 import puppeteer from 'puppeteer';
 import { 
@@ -13,23 +10,6 @@ import {
 import { COOKIE_SELECTORS } from '../constants/selectors.js';
 import { getTimestampedScreenshotPath } from '../constants/paths.js';
 
-/**
- * @typedef {Object} BrowserInstance
- * @property {import('puppeteer').Browser} browser - Puppeteer browser instance
- * @property {import('puppeteer').Page} page - Puppeteer page instance
- */
-
-/**
- * @typedef {Object} CookieResult
- * @property {boolean} firstButton - Whether first button was clicked
- * @property {boolean} cookieButton - Whether cookie button was clicked
- */
-
-/**
- * Launches Puppeteer browser with predefined configuration
- * @returns {Promise<BrowserInstance>} Browser and page instances
- * @throws {Error} If browser launch fails
- */
 export async function launchBrowser() {
     try {
         
@@ -48,8 +28,6 @@ export async function launchBrowser() {
             height: BROWSER_CONFIG.VIEWPORT_HEIGHT 
         });
 
-        // console.log(`Browser launched successfully (headless: ${BROWSER_CONFIG.HEADLESS})`);
-        // console.log(`Viewport set to ${BROWSER_CONFIG.VIEWPORT_WIDTH}x${BROWSER_CONFIG.VIEWPORT_HEIGHT}`);
         
         return { browser, page };
         
@@ -59,11 +37,7 @@ export async function launchBrowser() {
     }
 }
 
-/**
- * Safely closes the browser instance
- * @param {import('puppeteer').Browser} browser - Puppeteer browser instance
- * @returns {Promise<void>}
- */
+
 export async function closeBrowser(browser) {
     if (browser) {
         try {
@@ -77,11 +51,7 @@ export async function closeBrowser(browser) {
     }
 }
 
-/**
- * Sets up browser console logging with message filtering
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @returns {void}
- */
+
 export function setupBrowserLogging(page) {
     try {
         page.on('console', msg => {
@@ -134,17 +104,6 @@ export function setupBrowserLogging(page) {
     }
 }
 
-/**
- * Navigates to a URL with error handling and retries
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} url - URL to navigate to
- * @param {Object} [options] - Navigation options
- * @param {string} [options.waitUntil='networkidle2'] - Wait condition
- * @param {number} [options.timeout] - Navigation timeout
- * @param {number} [options.retries=2] - Number of retry attempts
- * @returns {Promise<void>}
- * @throws {Error} If navigation fails after retries
- */
 export async function gotoPage(page, url, options = {}) {
     const defaultOptions = {
         waitUntil: 'networkidle2',
@@ -185,12 +144,7 @@ export async function gotoPage(page, url, options = {}) {
     throw new Error(`Navigation to ${url} failed after ${retries + 1} attempts: ${lastError.message}`);
 }
 
-/**
- * Handles cookie popups and consent dialogs
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} [context=''] - Context description for logging
- * @returns {Promise<CookieResult>} Result of cookie handling attempts
- */
+
 export async function handleCookiePopups(page, context = '') {
     try {
         // console.log(`🍪 Checking for cookie popups... ${context}`);
@@ -246,16 +200,6 @@ export async function handleCookiePopups(page, context = '') {
     }
 }
 
-/**
- * Takes a screenshot with automatic naming and timestamp
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} name - Base name for the screenshot
- * @param {Object} [options] - Screenshot options
- * @param {boolean} [options.fullPage=true] - Whether to capture full page
- * @param {string} [options.type='png'] - Image format
- * @returns {Promise<string>} Path to the saved screenshot
- * @throws {Error} If screenshot fails
- */
 export async function takeScreenshot(page, name, options = {}) {
     try {
         const defaultOptions = {
@@ -280,13 +224,7 @@ export async function takeScreenshot(page, name, options = {}) {
     }
 }
 
-/**
- * Waits for network to become idle
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {number} [timeout] - Maximum wait time in milliseconds
- * @param {number} [delayAfter] - Additional delay after network idle
- * @returns {Promise<void>}
- */
+
 export async function waitForNetworkIdle(page, timeout = TIMEOUTS.NETWORK_IDLE, delayAfter = 1000) {
     try {
         console.log('⏳ Waiting for network to become idle...');
@@ -305,14 +243,6 @@ export async function waitForNetworkIdle(page, timeout = TIMEOUTS.NETWORK_IDLE, 
     }
 }
 
-/**
- * Waits for an element to be visible on the page
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} selector - CSS selector to wait for
- * @param {number} [timeout] - Maximum wait time in milliseconds
- * @returns {Promise<import('puppeteer').ElementHandle>} Element handle
- * @throws {Error} If element is not found within timeout
- */
 export async function waitForVisible(page, selector, timeout = TIMEOUTS.ELEMENT_WAIT) {
     try {
         console.log(`⏳ Waiting for element: ${selector}`);
@@ -331,11 +261,6 @@ export async function waitForVisible(page, selector, timeout = TIMEOUTS.ELEMENT_
     }
 }
 
-/**
- * Checks if page has loaded successfully by validating title and basic elements
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @returns {Promise<boolean>} True if page appears to have loaded correctly
- */
 export async function validatePageLoad(page) {
     try {
         const title = await page.title();

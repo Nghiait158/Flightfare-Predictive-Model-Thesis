@@ -1,31 +1,6 @@
-/**
- * @fileoverview DOM interaction utilities for Puppeteer
- */
 
 import { delay, DELAY_SHORT, TIMEOUTS } from '../constants/constants.js';
 
-/**
- * @typedef {Object} ClickOptions
- * @property {number} [timeout] - Maximum wait time for element
- * @property {boolean} [waitForVisible=true] - Whether to wait for element to be visible
- * @property {number} [delay] - Delay after click
- */
-
-/**
- * @typedef {Object} TypeOptions
- * @property {number} [delay=100] - Delay between keystrokes
- * @property {boolean} [clearFirst=true] - Whether to clear existing text first
- * @property {number} [timeout] - Maximum wait time for element
- */
-
-/**
- * Safely clicks on an element with error handling and retries
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} selector - CSS selector for the element
- * @param {string} elementName - Descriptive name for logging
- * @param {ClickOptions} [options={}] - Click options
- * @returns {Promise<boolean>} True if click succeeded
- */
 export async function safeClick(page, selector, elementName, options = {}) {
     const defaultOptions = {
         timeout: TIMEOUTS.ELEMENT_WAIT,
@@ -36,7 +11,6 @@ export async function safeClick(page, selector, elementName, options = {}) {
     const finalOptions = { ...defaultOptions, ...options };
     
     try {
-        // console.log(`Attempting to click: ${elementName} (${selector})`);
         
         // Wait for element if required
         if (finalOptions.waitForVisible) {
@@ -45,6 +19,7 @@ export async function safeClick(page, selector, elementName, options = {}) {
                 timeout: finalOptions.timeout 
             });
         }
+        
         // Check if element exists and is visible
         const element = await page.$(selector);
         if (!element) {
@@ -76,15 +51,6 @@ export async function safeClick(page, selector, elementName, options = {}) {
     }
 }
 
-/**
- * Types text into an input field with error handling
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} selector - CSS selector for the input field
- * @param {string} text - Text to type
- * @param {string} elementName - Descriptive name for logging
- * @param {TypeOptions} [options={}] - Typing options
- * @returns {Promise<boolean>} True if typing succeeded
- */
 export async function typeText(page, selector, text, elementName, options = {}) {
     const defaultOptions = {
         delay: 100,

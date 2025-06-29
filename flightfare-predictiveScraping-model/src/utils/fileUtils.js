@@ -1,21 +1,11 @@
-/**
- * @fileoverview File utilities for reading CSV, JSON and managing directories
- */
-
 import fs from 'fs';
 import path from 'path';
 import { createObjectCsvWriter } from 'csv-writer';
 import { SCREENSHOT_DIR } from '../constants/paths.js';
 
-/**
- * Reads and parses a CSV file
- * @param {string} filePath - Path to the CSV file
- * @returns {Array<Object>} Array of objects representing CSV rows
- * @throws {Error} If file cannot be read or parsed
- */
+// -----------READ_CSV------------
 export function readCSVFile(filePath) {
     try {
-        // console.log(`Reading CSV file: ${path.basename(filePath)}`);
         
         if (!fs.existsSync(filePath)) {
             throw new Error(`CSV file not found: ${filePath}`);
@@ -51,12 +41,7 @@ export function readCSVFile(filePath) {
     }
 }  
 
-/**
- * Reads and parses a JSON file
- * @param {string} filePath - Path to the JSON file
- * @returns {Object} Parsed JSON object
- * @throws {Error} If file cannot be read or parsed
- */
+// -------READ_JSON----------
 export function readJSONFile(filePath) {
     try {
         // console.log(`📖 Reading JSON file: ${path.basename(filePath)}`);
@@ -77,16 +62,10 @@ export function readJSONFile(filePath) {
     }
 }
 
-/**
- * Writes data to a JSON file
- * @param {Object} data - Data to write
- * @param {string} filePath - Path to the output JSON file
- * @param {boolean} pretty - Whether to format JSON with indentation (default: true)
- * @throws {Error} If file cannot be written
- */
+// --------WRITE_JSON
 export function writeJSONFile(data, filePath, pretty = true) {
     try {
-        console.log(`📝 Writing JSON file: ${path.basename(filePath)}`);
+        console.log(`Writing JSON file: ${path.basename(filePath)}`);
         
         const jsonContent = pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
         
@@ -106,11 +85,7 @@ export function writeJSONFile(data, filePath, pretty = true) {
     }
 }
 
-/**
- * Clears all files in a directory and creates it if it doesn't exist
- * @param {string} directoryPath - Path to the directory
- * @throws {Error} If directory operations fail
- */
+
 export function clearDirectory(directoryPath) {
     try {
         // console.log(`Clearing directory: ${path.basename(directoryPath)}`);

@@ -43,14 +43,10 @@ import {
  * @property {Object} metadata - Additional metadata about the crawl
  */
 
-const VIETJET_URL = 'https://www.vietjetair.com/vi/pages/bao-hiem-du-lich-sky-care-1681121104781';
+// const VIETJET_URL = 'https://www.vietjetair.com/vi/pages/bao-hiem-du-lich-sky-care-1681121104781';
+const VIETJET_URL = 'https://www.vietjetair.com/vi';
 
-/**
- * Main crawler orchestration function
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {CrawlerConfig} config - Crawler configuration
- * @returns {Promise<CrawlerResult>} Complete crawling result
- */
+// call from main.js
 export async function runCrawler(page, { flightConfig, airports }) {
     const startTime = Date.now();
     const screenshots = [];
@@ -73,18 +69,15 @@ export async function runCrawler(page, { flightConfig, airports }) {
     };
 
     try {
-        // console.log(`📍 Route: ${result.route}`);
-        // console.log(`⏰ Start time: ${result.metadata.startTime}`);
-        console.log(`Target  : ${VIETJET_URL}\n`);
+        console.log(`Target : ${VIETJET_URL}\n`);
 
-        console.log('📋 Setting up browser logging...');
         // set up return log
         setupBrowserLogging(page);
         steps.push('Browser logging configured');
-        console.log('✅ Browser logging configured\n');
-// ----------------------------------------------------------------------------------------------------
-        // Step 2: Navigate to VietJet page
-        console.log('📋 Navigating to target website...');
+
+        // ----------------------------------------------------------------------------------------------------
+        //  Navigate to VietJet page
+        console.log('Navigating to target website...');
         await gotoPage(page, VIETJET_URL, {
             waitUntil: 'networkidle2',
             timeout: 30000
@@ -254,7 +247,7 @@ export async function runCrawlerWithRetry(page, config, options = {}) {
         try {
             // Nếu lần thứ 2 retry:
             if (attempt > 0) {
-                console.log(`\n🔄 Retry attempt ${attempt}/${maxRetries}`);
+                console.log(`\nRetry attempt ${attempt}/${maxRetries}`);
                 console.log('================================');
                 await delay(retryDelay);
             }
@@ -281,12 +274,6 @@ export async function runCrawlerWithRetry(page, config, options = {}) {
     console.error(`❌ All ${maxRetries + 1} attempts failed. Last error: ${lastError.message}`);
     throw lastError;
 }
-
-/**
- * Validates crawler configuration before execution
- * @param {CrawlerConfig} config - Configuration to validate
- * @throws {Error} If configuration is invalid
- */
 
 // Xác thực các sân bay, điều kiện cho các sân bay
 export function validateCrawlerConfig(config) {

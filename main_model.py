@@ -59,6 +59,8 @@ class FlightPricePredictor:
         upper_bound = Q3 + 1.5 * IQR
 
         print(f"Eliminate the price which is < {lower_bound:,.0f} VNĐ or > {upper_bound:,.0f} VNĐ")
+
+        # lọc data=> bỏ outlier 
         before_outlier_removal = len(self.df)
         self.df = self.df[(self.df['price'] >= lower_bound) & (self.df['price'] <= upper_bound)]
         print(f"Eliminated {before_outlier_removal - len(self.df)} outliers")
@@ -75,6 +77,7 @@ class FlightPricePredictor:
         self.df['create_at'] = pd.to_datetime(self.df['create_at'], errors='coerce')
         self.df = self.df.dropna(subset=['create_at'])
         
+
         def parse_flight_date(date_str):
             if isinstance(date_str, str) and 'T' in date_str:
                 try:
@@ -84,9 +87,11 @@ class FlightPricePredictor:
             else:
                 return pd.NaT
         
+
         self.df['flight_date'] = self.df['flight_date'].apply(parse_flight_date)
         self.df = self.df.dropna(subset=['flight_date'])
-        
+
+        #delete ' ' 
         self.df['type_of_plane'] = self.df['type_of_plane'].str.strip()
         self.df = self.df[self.df['type_of_plane'] != '']
         self.df = self.df.dropna(subset=['type_of_plane'])
@@ -100,7 +105,9 @@ class FlightPricePredictor:
         self.df['create_month'] = self.df['create_at'].dt.month
         self.df['flight_month'] = self.df['flight_date'].dt.month
         self.df['flight_day_of_week'] = self.df['flight_date'].dt.dayofweek
+        # số ngày trc ngày đặt vé
         self.df['days_in_advance'] = (self.df['flight_date'] - self.df['create_at']).dt.days
+        # weekend
         self.df['is_weekend_booking'] = (self.df['create_day_of_week'] >= 5).astype(int)
         self.df['is_weekend_flight'] = (self.df['flight_day_of_week'] >= 5).astype(int)
 
@@ -146,6 +153,7 @@ class FlightPricePredictor:
             lambda row: route_counts.get((row['departure_airport'], row['arrival_airport']), 0), 
             axis=1
         )
+
         self.route_popularity_stats = {
             'mean': self.df['route_popularity'].mean(),
             'std': self.df['route_popularity'].std()
@@ -287,36 +295,6 @@ class FlightPricePredictor:
             for i, row in feature_importance.head(10).iterrows():
                 print(f"   {row['feature']}: {row['importance']:.4f}")
         
-    def plot_learning_curves(self):   
-        plt.figure(figsize=(12, 8))
-        
-        for i, (name, result) in enumerate(self.results.items()):
-            plt.subplot(2, 2, i+1)
-            train_sizes, train_scores, val_scores = learning_curve(
-                result['model'], self.X, self.y, cv=5, 
-                train_sizes=np.linspace(0.1, 1.0, 10),
-                scoring='neg_mean_absolute_error', n_jobs=-1
-            )
-            
-            train_mean = -train_scores.mean(axis=1)
-            train_std = train_scores.std(axis=1)
-            val_mean = -val_scores.mean(axis=1)
-            val_std = val_scores.std(axis=1)
-            
-            plt.plot(train_sizes, train_mean, 'o-', color='blue', label='Training MAE')
-            plt.fill_between(train_sizes, train_mean - train_std, train_mean + train_std, alpha=0.1, color='blue')
-            
-            plt.plot(train_sizes, val_mean, 'o-', color='red', label='Validation MAE')
-            plt.fill_between(train_sizes, val_mean - val_std, val_mean + val_std, alpha=0.1, color='red')
-            
-            plt.title(f'{name} Learning Curve')
-            plt.xlabel('Training Set Size')
-            plt.ylabel('MAE')
-            plt.legend()
-            plt.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.show()
         
     def save_model(self, filename='flight_price_model.pkl'):
         model_data = {
@@ -352,7 +330,7 @@ class FlightPricePredictor:
         
     def predict_single_flight(self, flight_data):
         if self.best_model is None:
-            raise ValueError("? model đâu ??")
+            raise ValueError("? model ??")
         
         print(f"Input data: {flight_data}")
         
@@ -448,62 +426,62 @@ class FlightPricePredictor:
         
         return prediction
     
-    def demo_predictions(self):
-        print("=" * 50)
+    # def demo_predictions(self):
+    #     print("=" * 50)
         
-        flight1 = {
-            'flight_number': 'VJ1198',
-            'departure_airport': 'SGN',
-            'arrival_airport': 'HAN',
-            'departure_time': '08:00',
-            'arrival_time': '10:15',
-            'classes': 'Eco',
-            'type_of_plane': 'Airbus A321',
-            'create_at': '2024-01-15 10:30:00',
-            'flight_date': '2024-01-20T08:00:00'
-        }
+    #     flight1 = {
+    #         'flight_number': 'VJ1198',
+    #         'departure_airport': 'SGN',
+    #         'arrival_airport': 'HAN',
+    #         'departure_time': '08:00',
+    #         'arrival_time': '10:15',
+    #         'classes': 'Eco',
+    #         'type_of_plane': 'Airbus A321',
+    #         'create_at': '2024-01-15 10:30:00',
+    #         'flight_date': '2024-01-20T08:00:00'
+    #     }
         
-        flight2 = {
-            'flight_number': 'VJ124',
-            'departure_airport': 'SGN',
-            'arrival_airport': 'HAN',
-            'departure_time': '14:30',
-            'arrival_time': '16:45',
-            'classes': 'Eco',
-            'type_of_plane': 'Airbus A320',
-            'create_at': '2024-01-01 09:00:00',
-            'flight_date': '2024-02-15T14:30:00'
-        }
+    #     flight2 = {
+    #         'flight_number': 'VJ124',
+    #         'departure_airport': 'SGN',
+    #         'arrival_airport': 'HAN',
+    #         'departure_time': '14:30',
+    #         'arrival_time': '16:45',
+    #         'classes': 'Eco',
+    #         'type_of_plane': 'Airbus A320',
+    #         'create_at': '2024-01-01 09:00:00',
+    #         'flight_date': '2024-02-15T14:30:00'
+    #     }
         
-        flight3 = {
-            'flight_number': 'VJ196',
-            'departure_airport': 'SGN',
-            'arrival_airport': 'HAN',
-            'departure_time': '19:00',
-            'arrival_time': '21:15',
-            'classes': 'Business',
-            'type_of_plane': 'Airbus A320',
-            'create_at': '2024-01-18 15:20:00',
-            'flight_date': '2024-01-25T19:00:00'
-        }
+    #     flight3 = {
+    #         'flight_number': 'VJ196',
+    #         'departure_airport': 'SGN',
+    #         'arrival_airport': 'HAN',
+    #         'departure_time': '19:00',
+    #         'arrival_time': '21:15',
+    #         'classes': 'Business',
+    #         'type_of_plane': 'Airbus A320',
+    #         'create_at': '2024-01-18 15:20:00',
+    #         'flight_date': '2024-01-25T19:00:00'
+    #     }
         
-        demo_flights = [
-            ("Economy SGN-HAN", flight1),
-            ("book vé sớm", flight2),
-            ("Business class", flight3)
-        ]
+    #     demo_flights = [
+    #         ("Economy SGN-HAN", flight1),
+    #         ("book vé sớm", flight2),
+    #         ("Business class", flight3)
+    #     ]
 
-        for name, flight in demo_flights:
-                price = self.predict_single_flight(flight)
-                advance_days = (pd.to_datetime(flight['flight_date']) - 
-                              pd.to_datetime(flight['create_at'])).days
-                print(f"\n {name}:")
-                print(f"   Route: {flight['departure_airport']} → {flight['arrival_airport']}")
-                print(f"   Time: {flight['departure_time']} - {flight['arrival_time']}")
-                print(f"   Class: {flight['classes']}")
-                print(f"   Aircraft: {flight['type_of_plane']}")
-                print(f"   Advance booking: {advance_days} ngày")
-                print(f"   Predicted Price: {price:,.0f} VNĐ")
+    #     for name, flight in demo_flights:
+    #             price = self.predict_single_flight(flight)
+    #             advance_days = (pd.to_datetime(flight['flight_date']) - 
+    #                           pd.to_datetime(flight['create_at'])).days
+    #             print(f"\n {name}:")
+    #             print(f"   Route: {flight['departure_airport']} → {flight['arrival_airport']}")
+    #             print(f"   Time: {flight['departure_time']} - {flight['arrival_time']}")
+    #             print(f"   Class: {flight['classes']}")
+    #             print(f"   Aircraft: {flight['type_of_plane']}")
+    #             print(f"   Advance booking: {advance_days} ngày")
+    #             print(f"   Predicted Price: {price:,.0f} VNĐ")
             
 
     def analyze_data_distribution(self):
@@ -515,18 +493,7 @@ class FlightPricePredictor:
         print(f"Price range: {self.df['price'].min():,.0f} - {self.df['price'].max():,.0f} VNĐ")
         print(f"Mean price: {self.df['price'].mean():,.0f} VNĐ")
         print(f"Median price: {self.df['price'].median():,.0f} VNĐ")
-        # print("\nPhân phối theo hạng vé:")
-        # print(self.df['classes'].value_counts())
-        # print("\nPhân phối theo sân bay:")
-        # print("Departure airports:")
-        # print(self.df['departure_airport'].value_counts().head())
-        # print("Arrival airports:")
-        # print(self.df['arrival_airport'].value_counts().head())
-        # print("\nPhân phối theo loại máy bay:")
-        # print(self.df['type_of_plane'].value_counts())
-        # print("\nGiá trung bình theo hạng vé:")
-        # price_by_class = self.df.groupby('classes')['price'].agg(['mean', 'count'])
-        # print(price_by_class)
+
     
     def run_complete_pipeline(self):
         print("=" * 60)

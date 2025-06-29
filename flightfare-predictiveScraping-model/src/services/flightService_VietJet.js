@@ -848,6 +848,11 @@ export async function submitSearchForm(page, tripType = 'oneway') {
         // Click cheapest ticket checkbox only if configured to do so
         if (shouldFindCheapest) {
             console.log('🎯 Attempting to select cheapest ticket option (enabled in config)...');
+            await page.evaluate(() => {
+                window.scrollBy(0, 1000);
+            });
+            console.log('đã scroll');
+                            
             const cheapestSelected = await safeClick(
                 page, 
                 SELECTORS.SEARCH.CHEAPEST_CHECKBOX, 
@@ -865,13 +870,83 @@ export async function submitSearchForm(page, tripType = 'oneway') {
         }
         
         await delay(DELAY_SHORT);
+       
+
+        await delay(1000)
         
-        // Click search button
-        const searchButtonClicked = await safeClick(
-            page, 
-            SELECTORS.SEARCH.SEARCH_BUTTON, 
-            'Search flight button'
-        );
+        // Click on container div first, then search button
+        console.log('🔍 Attempting to find and click search button container and button...');
+        
+        let searchButtonClicked = false;
+        
+        try {
+            // Strategy 1: Find search button container and click both container and button
+            console.log('📍 Finding search button container and button...');
+            
+            // Wait for search form area to be ready
+            await page.waitForSelector('button.MuiButton-contained', { timeout: 5000 });
+            
+            // Find the search button and its container using page evaluation
+            const result = await page.evaluate(() => {
+                // Find all Material-UI contained buttons
+                const buttons = document.querySelectorAll('button.MuiButton-contained[type="button"]');
+                
+                for (const button of buttons) {
+                    // Check if this is the search button by looking for "Tìm chuyến bay" text
+                    const labelSpan = button.querySelector('span.MuiButton-label');
+                    if (labelSpan && labelSpan.textContent && labelSpan.textContent.trim() === 'Tìm chuyến bay') {
+                        
+                        // Get parent container div
+                        const container = button.parentElement;
+                        
+                        if (container) {
+                            console.log('Found search button and container');
+                            
+                            // Scroll to container first
+                            container.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            
+                            // Small delay for scroll
+                            setTimeout(() => {
+                                // Click container first
+                                console.log('Clicking container div...');
+                                container.click();
+                                
+                                // Then click button
+                                setTimeout(() => {
+                                    console.log('Clicking search button...');
+                                    button.click();
+                                }, 300);
+                            }, 500);
+                            
+                            return { success: true, found: true };
+                        }
+                    }
+                }
+                
+                return { success: false, found: false };
+            });
+            
+            if (result && result.success) {
+                console.log('✅ Search button container and button clicked successfully');
+                searchButtonClicked = true;
+                await delay(1000); // Wait for click processing
+            } else {
+                console.log('⚠️ Could not find search button with expected structure');
+            }
+            
+        } catch (error) {
+            console.log('⚠️ Strategy 1 failed:', error.message);
+        }
+        
+        // Fallback: Use original safeClick method if above strategy fails
+        if (!searchButtonClicked) {
+            console.log('🔄 Falling back to direct button click...');
+            searchButtonClicked = await safeClick(
+                page, 
+                SELECTORS.SEARCH.SEARCH_BUTTON, 
+                'Search flight button'
+            );
+        }
         
         if (searchButtonClicked) {
             console.log('✅ Search form submitted successfully');

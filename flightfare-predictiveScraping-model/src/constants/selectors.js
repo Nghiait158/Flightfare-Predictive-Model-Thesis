@@ -1,10 +1,4 @@
-/**
- * @fileoverview CSS and XPath selectors for DOM elements - Updated for modular architecture
- */
 
-/**
- * Main selectors object for easy import
- */
 export const SELECTORS = {
     // Cookies and popups
     COOKIES: {
@@ -45,6 +39,7 @@ export const SELECTORS = {
         ROUNDTRIP_RADIO: 'input[type="radio"][value="roundtrip"], input[value="roundTrip"], label[for="roundTrip"], .trip-type-roundtrip',
         CHEAPEST_CHECKBOX: 'input[type="checkbox"][aria-label="primary checkbox"][value="primary"], .cheapest-checkbox, input[name="cheapest"]',
         SEARCH_BUTTON: 'button.MuiButtonBase-root.MuiButton-root.MuiButton-contained[type="button"], .search-button, button[type="submit"]'
+        // SEARCH_BUTTON: 'button.MuiButtonBase-root.MuiButton-contained
     },
     
     // Results page

@@ -136,7 +136,6 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
     const startMonth = parseInt(parts[1]) - 1; // Month is 0-indexed in Date
     const startYear = parseInt(parts[2]);
     
-    // Build a map of flight numbers to aircraft types from the main list.
     const aircraftTypeMap = await page.evaluate(() => {
         const flightAircraftMap = {};
         // Find all spans that look like flight numbers. This is a stable starting point.
@@ -146,11 +145,6 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             const flightNumber = flightSpan.textContent.trim();
             let aircraftType = null;
             
-            // Heuristic to find the container for a single flight's info.
-            // We traverse up the DOM tree from the flight number span until we find an element
-            // that also contains the text "Bay thẳng" (Direct Flight), which is a reliable
-            // marker for a flight row in Vietjet's UI. We limit the search to 8 levels up
-            // to prevent scanning the entire page.
             let current = flightSpan;
             let container = null;
             for (let i = 0; i < 8; i++) {

@@ -179,20 +179,23 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
     console.log('✈️ Aircraft Type Map:', aircraftTypeMap);
     
     const startDate = new Date(startYear, startMonth, startDay);
-    const currentMonth = startDate.getMonth();
-    const currentYear = startDate.getFullYear();
+
+    const total_days_crawled= 3;
+    // Calculate endDay by adding 15 days to startDate
+    const endDay = new Date(startDate); 
+    endDay.setDate(startDate.getDate() + total_days_crawled);
     
-    // Calculate the last day of the month (30 or 31 depending on the month)
-    const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-    const endDay = Math.min(30, lastDayOfMonth); // Stop at day 30 or last day of month if less than 30
-    
-    console.log(`🚀 Starting crawl from day ${startDate.getDate()} to day ${endDay} of month ${currentMonth + 1}/${currentYear}`);
+    const endDayDate = endDay.getDate();
+    const endDayMonth = endDay.getMonth() + 1; // Months are 0-indexed
+    const endDayYear = endDay.getFullYear();
+
+    console.log(`🚀 Starting crawl from day ${startDate.getDate()} to day ${endDayDate} of month ${endDayMonth}/${endDayYear}`);
     
     let currentDateToCrawl = dateString;
-    let dayCounter = startDate.getDate();
+    let dayCounter = 0; // Counter for days processed (0 to 14 = 15 days)
     
-    while (dayCounter <= endDay) {
-        console.log(`\n📅 CRAWLING DATA FOR: ${currentDateToCrawl} (Day ${dayCounter})`);
+    while (dayCounter < total_days_crawled) {
+        console.log(`\n📅 CRAWLING DATA FOR: ${currentDateToCrawl} (Day ${dayCounter + 1}/${total_days_crawled})`);
         
         const results = {
             timestamp: new Date().toISOString(),
@@ -226,7 +229,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             allResults.push(results);
             
             // Try to go to next day even if current day failed
-            if (dayCounter < endDay) {
+            if (dayCounter < 14) { // 0 to 14 = 15 days
                 await goToNextDay(page);
                 dayCounter++;
                 currentDateToCrawl = getNextDateString(currentDateToCrawl);
@@ -244,7 +247,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             allResults.push(results);
             
             // Try to go to next day even if no prices found
-            if (dayCounter < endDay) {
+            if (dayCounter < 14) { // 0 to 14 = 15 days
                 await goToNextDay(page);
                 dayCounter++;
                 currentDateToCrawl = getNextDateString(currentDateToCrawl);
@@ -256,7 +259,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
 
         
         for (let i = 0; i < priceOptionsCount; i++) {
-            console.log(`PROCESSING PRICE OPTION ${i + 1}/${priceOptionsCount}`);
+            // console.log(`PROCESSING PRICE OPTION ${i + 1}/${priceOptionsCount}`);
             
             // Rebuild aircraft type map for current page state (to capture dynamic content)
             const currentAircraftTypeMap = await page.evaluate(() => {
@@ -479,7 +482,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
         allResults.push(results);
         
         // Move to next day if not at the end
-        if (dayCounter < endDay) {
+        if (dayCounter < 14) { // 0 to 14 = 15 days
             console.log(`🔄 Moving to next day...`);
             await goToNextDay(page);
             dayCounter++;
@@ -488,7 +491,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             // Add delay between days to avoid overwhelming the server
             await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
-            console.log(`🏁 Reached end day (${endDay}). Crawling complete.`);
+            console.log(`🏁 Reached end day (15 days total). Crawling complete.`);
             break;
         }
     }

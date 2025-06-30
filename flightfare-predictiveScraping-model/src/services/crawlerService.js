@@ -1,6 +1,4 @@
-/**
- * @fileoverview Main crawler service - Orchestrates the complete crawling workflow
- */
+// -- -----------Main crawler service----------
 
 import { delay, DELAY_MEDIUM, DELAY_LONG } from '../constants/constants.js';
 
@@ -22,29 +20,9 @@ import {
     getFlightResults
 } from '../services/flightService_VietJet.js';
 
-/**
- * @typedef {Object} CrawlerConfig
- * @property {Object} flightConfig - Flight configuration object
- * @property {string} flightConfig.departure_airport - Departure airport code
- * @property {string} flightConfig.arrival_airport - Arrival airport code
- * @property {Object} flightConfig.search_options - Search options
- * @property {Array} airports - Array of available airports
- */
-
-/**
- * @typedef {Object} CrawlerResult
- * @property {boolean} success - Whether the crawling was successful
- * @property {string} route - Flight route (departure → arrival)
- * @property {number} duration - Total execution time in milliseconds
- * @property {Object} results - Flight search results
- * @property {Array<string>} screenshots - List of screenshot paths taken
- * @property {Array<string>} steps - List of completed steps
- * @property {string} [error] - Error message if failed
- * @property {Object} metadata - Additional metadata about the crawl
- */
-
-// const VIETJET_URL = 'https://www.vietjetair.com/vi/pages/bao-hiem-du-lich-sky-care-1681121104781';
-const VIETJET_URL = 'https://www.vietjetair.com/vi';
+// const vietjet_URL = 'https://www.vietjetair.com/vi/pages/bao-hiem-du-lich-sky-care-1681121104781';
+const vietjet_URL = 'https://www.vietjetair.com/vi';
+const vietnamairlines_URL = 'https://www.vietnamairlines.com/vn/en';
 
 // call from main.js
 export async function runCrawler(page, { flightConfig, airports }) {
@@ -62,14 +40,14 @@ export async function runCrawler(page, { flightConfig, airports }) {
         error: null,
         metadata: {
             startTime: new Date().toISOString(),
-            url: VIETJET_URL,
+            url: vietjet_URL,
             userAgent: await page.evaluate(() => navigator.userAgent),
             viewport: await page.viewport()
         }
     };
 
     try {
-        console.log(`Target : ${VIETJET_URL}\n`);
+        console.log(`Target : ${vietjet_URL}\n`);
 
         // set up return log
         setupBrowserLogging(page);
@@ -78,11 +56,13 @@ export async function runCrawler(page, { flightConfig, airports }) {
         // ----------------------------------------------------------------------------------------------------
         //  Navigate to VietJet page
         console.log('Navigating to target website...');
-        await gotoPage(page, VIETJET_URL, {
+        
+        // go to VietjetPage
+        await gotoPage(page, vietjet_URL, {
             waitUntil: 'networkidle2',
             timeout: 30000
         });
-        
+
         // Validate page load
         const pageValid = await validatePageLoad(page);
         if (!pageValid) {
@@ -228,15 +208,8 @@ export async function runCrawler(page, { flightConfig, airports }) {
     }
 }
 
-/**
- * Runs crawler with retry logic for robustness
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {CrawlerConfig} config - Crawler configuration
- * @param {Object} [options] - Retry options
- * @param {number} [options.maxRetries=2] - Maximum number of retries
- * @param {number} [options.retryDelay=5000] - Delay between retries in milliseconds
- * @returns {Promise<CrawlerResult>} Complete crawling result
- */
+// -----------------------Runs crawler with retry logic --------------------
+
 export async function runCrawlerWithRetry(page, config, options = {}) {
     const { maxRetries = 2, retryDelay = 5000 } = options;
     

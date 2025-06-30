@@ -70,11 +70,7 @@ function validateFlightConfigStructure(config) {
     }
 }
 
-/**
- * Validates airport data structure
- * @param {Array<Airport>} airports - Array of airports to validate
- * @throws {Error} If airport data is invalid
- */
+// --------------------Validates airport data structure---------------------
 function validateAirportsData(airports) {
     
     if (!Array.isArray(airports) || airports.length === 0) {
@@ -104,25 +100,16 @@ function validateAirportsData(airports) {
     }
 }
 
-/**
- * Finds airport by code
- * @param {Array<Airport>} airports - Array of airports
- * @param {string} code - Airport code to search for
- * @returns {Airport|undefined} Found airport or undefined
- */
+// -------------------Finds airport by code------------
+ 
 function findAirportByCode(airports, code) {
     return airports.find(airport => 
         airport.code && airport.code.toUpperCase() === code.toUpperCase()
     );
 }
 
-/**
- * Validates that departure and arrival airports exist in the airports data
- * @param {FlightConfig} flightConfig - Flight configuration
- * @param {Array<Airport>} airports - Array of available airports
- * @returns {Object} Object containing departure and arrival airport details
- * @throws {Error} If airports are not found
- */
+// ---------------Validates that departure and arrival airports exist in the airports data---------------
+
 function validateAirportAvailability(flightConfig, airports) {
     const departureAirport = findAirportByCode(airports, flightConfig.departure_airport);
     const arrivalAirport = findAirportByCode(airports, flightConfig.arrival_airport);
@@ -142,48 +129,31 @@ function validateAirportAvailability(flightConfig, airports) {
     return { departureAirport, arrivalAirport };
 }
 
-/**
- * Loads and validates flight configuration and airports data
- * @param {string} [airportsPath] - Path to airports CSV file (optional, uses default)
- * @param {string} [configPath] - Path to flight config JSON file (optional, uses default)
- * @returns {Promise<LoadedConfig>} Validated configuration and airport data
- * @throws {Error} If loading or validation fails
- */
+// -----------------------------Loads and validates flight configuration and airports data-----------------------------------
+
 export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configPath = FLIGHT_CONFIG_PATH) {
     try {
-        // console.log('Loading flight configuration and airports data...');
-
-        // Load airports data
-        // console.log('Loading airports database...');
-
+        
+        // read airport data
         const airports = readCSVFile(airportsPath);
-
         validateAirportsData(airports);
 
-        // console.log(`Loaded ${airports.length} airports from database`);
-
-        // Load flight configuration
-        // console.log('Loading flight configuration...');
-        
+        // read fight config
         const flightConfig = readJSONFile(configPath);
         validateFlightConfigStructure(flightConfig);
         console.log(`Flight configuration loaded: ${flightConfig.departure_airport} → ${flightConfig.arrival_airport}`);
 
-        // Validate airport availability
-        // console.log('🔍 Validating airport availability...');
         const { departureAirport, arrivalAirport } = validateAirportAvailability(flightConfig, airports);
+
         
-        // console.log(`✅ Departure: ${departureAirport.city} (${departureAirport.code}) - ${departureAirport.airport_name}`);
-        // console.log(`✅ Arrival: ${arrivalAirport.city} (${arrivalAirport.code}) - ${arrivalAirport.airport_name}`);
-        // console.log(`✅ Search options: ${JSON.stringify(flightConfig.search_options, null, 2)}`);
-        // Set default values for search options if not provided
         const defaultSearchOptions = {
             trip_type: 'oneway',
             find_cheapest: true,
             departure_date: 'today'
         };
 
-        // Nếu mà không có config trc thì mặc định như bên trên 
+        // If there is no previous config, the default is as above
+        // Nếu không có config trc thì mặc định như bên trên 
         const finalConfig = {
             ...flightConfig,
             search_options: {
@@ -191,9 +161,6 @@ export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configP
                 ...flightConfig.search_options
             }
         };
-
-        // console.log('Configuration validation completed!');
-
         return {
             flightConfig: finalConfig,
             airports,
@@ -207,35 +174,20 @@ export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configP
     }
 }
 
-/**
- * Gets available airports filtered by country
- * @param {Array<Airport>} airports - Array of airports
- * @param {string} country - Country name to filter by
- * @returns {Array<Airport>} Filtered airports
- */
+// -----------------------Gets available airports filtered by country------------
 export function getAirportsByCountry(airports, country) {
     return airports.filter(airport => 
         airport.country && airport.country.toLowerCase() === country.toLowerCase()
     );
 }
 
-/**
- * Gets airport details by code
- * @param {Array<Airport>} airports - Array of airports
- * @param {string} code - Airport code
- * @returns {Airport|null} Airport details or null if not found
- */
-export function getAirportByCode(airports, code) {
-    return findAirportByCode(airports, code) || null;
-}
+// -------------------------- Gets airport details by code--------------------
 
-/**
- * Validates if a route (departure → arrival) is supported
- * @param {Array<Airport>} airports - Array of airports
- * @param {string} departureCode - Departure airport code
- * @param {string} arrivalCode - Arrival airport code
- * @returns {boolean} True if route is supported
- */
+// export function getAirportByCode(airports, code) {
+//     return findAirportByCode(airports, code) || null;
+// }
+
+// Validates if a route (departure → arrival) is real
 export function isRouteSupported(airports, departureCode, arrivalCode) {
     const departure = findAirportByCode(airports, departureCode);
     const arrival = findAirportByCode(airports, arrivalCode);

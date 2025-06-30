@@ -3,7 +3,7 @@ import path from 'path';
 import { createObjectCsvWriter } from 'csv-writer';
 import { SCREENSHOT_DIR } from '../constants/paths.js';
 
-// -----------READ_CSV------------
+// ----------------------READ_CSV-----------------------------
 export function readCSVFile(filePath) {
     try {
         
@@ -41,7 +41,7 @@ export function readCSVFile(filePath) {
     }
 }  
 
-// -------READ_JSON----------
+// ----------------------------READ_JSON-------------------------------
 export function readJSONFile(filePath) {
     try {
         // console.log(`📖 Reading JSON file: ${path.basename(filePath)}`);
@@ -85,11 +85,9 @@ export function writeJSONFile(data, filePath, pretty = true) {
     }
 }
 
-
+//  ----------------------------Clean Directory--------------------------
 export function clearDirectory(directoryPath) {
     try {
-        // console.log(`Clearing directory: ${path.basename(directoryPath)}`);
-        
         if (fs.existsSync(directoryPath)) {
             const files = fs.readdirSync(directoryPath);
             let deletedCount = 0;
@@ -120,21 +118,13 @@ export function clearDirectory(directoryPath) {
     }
 }
 
-/**
- * Checks if a file exists
- * @param {string} filePath - Path to check
- * @returns {boolean} True if file exists
- */
+// --------------------- Checks if a file exists---------------------
 export function fileExists(filePath) {
     return fs.existsSync(filePath);
 }
 
-/**
- * Gets file size in bytes
- * @param {string} filePath - Path to the file
- * @returns {number} File size in bytes
- * @throws {Error} If file doesn't exist
- */
+// -----------------------Gets file size in bytes---------------------------
+
 export function getFileSize(filePath) {
     try {
         const stats = fs.statSync(filePath);
@@ -143,13 +133,8 @@ export function getFileSize(filePath) {
         throw new Error(`Cannot get file size: ${error.message}`);
     }
 }
+// -----------------------Reads a text file for script injection--------------------
 
-/**
- * Reads a text file for script injection
- * @param {string} filePath - Path to the script file
- * @returns {string} File content as string
- * @throws {Error} If file cannot be read
- */
 export function readScriptFile(filePath) {
     try {
         console.log(`📜 Reading script file: ${path.basename(filePath)}`);
@@ -167,29 +152,20 @@ export function readScriptFile(filePath) {
     }
 }
 
-/**
- * Initialize screenshot directory (convenience function)
- * Clears the screenshot directory used by the application
- */
 export function initializeScreenshotDirectory() {
     clearDirectory(SCREENSHOT_DIR);
 }
 
-/**
- * Appends data to a JSON file. If the file doesn't exist, it's created.
- * Assumes the root of the JSON file is an array.
- * @param {string} filePath - Path to the JSON file.
- * @param {Object} dataToAppend - The new data object to add to the array.
- */
+// ------------------------Appends data to a JSON file------------------------------------ 
+// -------------------------If the file doesn't exist, it's created------------------------
 export function appendToJsonFile(filePath, dataToAppend) {
     try {
         let existingData = [];
         
-        // Ensure directory exists
         const directory = path.dirname(filePath);
         if (!fs.existsSync(directory)) {
             fs.mkdirSync(directory, { recursive: true });
-            console.log(`📁 Created directory: ${directory}`);
+            console.log(`Created directory: ${directory}`);
         }
 
         if (fs.existsSync(filePath)) {
@@ -210,22 +186,15 @@ export function appendToJsonFile(filePath, dataToAppend) {
             console.warn(`File at ${filePath} does not contain a JSON array. Overwriting with new data.`);
             existingData = [];
         }
-
         existingData.push(dataToAppend);
-
         fs.writeFileSync(filePath, JSON.stringify(existingData, null, 2), 'utf-8');
-        console.log(`✅ Data appended to ${filePath}`);
+        console.log(`Data appended to ${filePath}`);
     } catch (error) {
         console.error(`❌ Failed to append to JSON file at ${filePath}:`, error);
     }
 }
 
-/**
- * Appends data to a CSV file.
- * Creates the file and adds headers if it doesn't exist.
- * @param {string} filePath - Path to the CSV file
- * @param {Array<Object>} records - Array of records to append
- */
+// --------------------------------Appends data to a CSV file------------------------------
 export async function appendToCsvFile(filePath, records) {
     try {
         const fileExists = fs.existsSync(filePath);
@@ -242,6 +211,7 @@ export async function appendToCsvFile(filePath, records) {
             header: [
                 { id: 'created_at', title: 'created_at' },
                 { id: 'flight_number', title: 'flight_number' },
+                // { id: 'type_of_plane', title: 'type_of_plane' },
                 { id: 'aircraft_type', title: 'aircraft_type' },
                 { id: 'departure_airport', title: 'departure_airport' },
                 { id: 'arrival_airport', title: 'arrival_airport' },
@@ -263,7 +233,7 @@ export async function appendToCsvFile(filePath, records) {
 
         await csvWriter.writeRecords(recordsWithTimestamp);
         
-        console.log(`✅ Data appended to ${path.basename(filePath)}`);
+        console.log(`Data appended to ${path.basename(filePath)}`);
     } catch (error) {
         console.error(`❌ Error writing to CSV file:`, error);
     }

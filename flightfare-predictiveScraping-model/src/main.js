@@ -1,7 +1,6 @@
 import { clearDirectory } from './utils/fileUtils.js';
 import { loadFlightConfig } from './config/loadConfig.js';
 import { 
-    //getBrowser,
     closeBrowser,
     launchBrowser, 
     setupBrowserLogging, 
@@ -15,34 +14,13 @@ import {
 } from './services/crawlerService.js';
 import fs from 'fs';
 
-// Constants and paths
 import { SCREENSHOT_DIR, FLIGHT_CONFIG_PATH, RESULT_DIR } from './constants/paths.js';
 import { BROWSER_CONFIG, delay } from './constants/constants.js';
 
-// App-level constants
 const MAX_RETRIES = 3;
 const BASE_URL = 'https://www.vietjetair.com/vi';
 
 
-// ----- use for auto scraping by n8n ----------------
-function incrementDepartureMonth(jsonData) {
-    if (jsonData && jsonData.search_options && jsonData.search_options.departure_date) {
-        let [day, month, year] = jsonData.search_options.departure_date.split('/').map(Number);
-
-        month++; // Tăng tháng lên 1
-
-        if (month > 12) {
-            month = 1; 
-            year++;    
-        }
-
-        const newDay = String(day).padStart(2, '0');
-        const newMonth = String(month).padStart(2, '0');
-
-        jsonData.search_options.departure_date = `${newDay}/${newMonth}/${year}`;
-    }
-    return jsonData;
-}
 
 
 async function main(options = {}) {
@@ -100,6 +78,8 @@ async function main(options = {}) {
 
 // ------------------------------------------------Launch browser(Khởi động website)------------------------------------------------
         console.log('Launching browser...');
+        
+        // const browserResult = await launchBrowser(BASE_URL);        
         const browserResult = await launchBrowser(BASE_URL);
         browser = browserResult.browser;
         page = browserResult.page;
@@ -114,7 +94,6 @@ async function main(options = {}) {
         console.log('Setting up browser logging...');
         setupBrowserLogging(page);
 // -------------------------------------------------Run main crawler-------------------------------------------------
-        
         console.log('Starting main crawler execution...');
         let crawlerResult;
         
@@ -278,10 +257,6 @@ async function entryPoint() {
         clearScreenshots: !args.includes('--keep-screenshots')
     };
 
-    // Display startup information
-    // console.log('🚀 VietJet Flight Crawler Starting...');
-    // console.log('=====================================');
-    
     if (args.length > 0) {
         console.log('Command line arguments detected:');
         args.forEach(arg => console.log(`   • ${arg}`));
@@ -309,6 +284,52 @@ async function entryPoint() {
         process.exit(1);
     }
 }
+
+
+// ------------------------------- use for auto scraping by n8n -----------------------------
+// function incrementDepartureMonth(jsonData) {
+//     if (jsonData && jsonData.search_options && jsonData.search_options.departure_date) {
+//         let [day, month, year] = jsonData.search_options.departure_date.split('/').map(Number);
+
+//         month++; // Tăng tháng lên 1
+
+//         if (month > 12) {
+//             month = 1; 
+//             year++;    
+//         }
+
+//         const newDay = String(day).padStart(2, '0');
+//         const newMonth = String(month).padStart(2, '0');
+
+//         jsonData.search_options.departure_date = `${newDay}/${newMonth}/${year}`;
+//     }
+//     return jsonData;
+// }
+
+
+function incrementDepartureMonth(jsonData) { // Tên hàm vẫn giữ nguyên nhưng chức năng thay đổi
+    if (jsonData && jsonData.search_options && jsonData.search_options.departure_date) {
+        // Chuyển đổi chuỗi ngày "DD/MM/YYYY" sang đối tượng Date
+        // Lưu ý: Đối tượng Date trong JS có tháng bắt đầu từ 0 (0-11)
+        let [day, month, year] = jsonData.search_options.departure_date.split('/').map(Number);
+        
+        // Tạo đối tượng Date. Trừ 1 từ tháng vì Date object sử dụng 0-indexed month.
+        let currentDate = new Date(year, month - 1, day);
+
+        // Tăng ngày lên 15
+        currentDate.setDate(currentDate.getDate() + 15);
+
+        // Lấy lại các thành phần ngày, tháng, năm từ đối tượng Date đã cập nhật
+        const newDay = String(currentDate.getDate()).padStart(2, '0');
+        const newMonth = String(currentDate.getMonth() + 1).padStart(2, '0'); // Cộng 1 vì tháng là 0-indexed
+        const newYear = currentDate.getFullYear();
+
+        // Gán lại chuỗi ngày đã cập nhật vào jsonData
+        jsonData.search_options.departure_date = `${newDay}/${newMonth}/${newYear}`;
+    }
+    return jsonData;
+}
+// ------------------------------------------------------------------------------------------
 
 // Usage information
 if (process.argv.includes('--help') || process.argv.includes('-h')) {

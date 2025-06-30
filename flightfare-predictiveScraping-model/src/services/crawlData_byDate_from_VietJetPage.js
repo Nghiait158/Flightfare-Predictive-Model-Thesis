@@ -180,8 +180,8 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
     
     const startDate = new Date(startYear, startMonth, startDay);
 
-    const total_days_crawled= 3;
-    // Calculate endDay by adding 15 days to startDate
+    const total_days_crawled= 15;
+    
     const endDay = new Date(startDate); 
     endDay.setDate(startDate.getDate() + total_days_crawled);
     
@@ -192,7 +192,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
     console.log(`🚀 Starting crawl from day ${startDate.getDate()} to day ${endDayDate} of month ${endDayMonth}/${endDayYear}`);
     
     let currentDateToCrawl = dateString;
-    let dayCounter = 0; // Counter for days processed (0 to 14 = 15 days)
+    let dayCounter = 0; // Counter for days processed (0 to total_days_crawled-1)
     
     while (dayCounter < total_days_crawled) {
         console.log(`\n📅 CRAWLING DATA FOR: ${currentDateToCrawl} (Day ${dayCounter + 1}/${total_days_crawled})`);
@@ -229,7 +229,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             allResults.push(results);
             
             // Try to go to next day even if current day failed
-            if (dayCounter < 14) { // 0 to 14 = 15 days
+            if (dayCounter < total_days_crawled - 1) {
                 await goToNextDay(page);
                 dayCounter++;
                 currentDateToCrawl = getNextDateString(currentDateToCrawl);
@@ -247,7 +247,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             allResults.push(results);
             
             // Try to go to next day even if no prices found
-            if (dayCounter < 14) { // 0 to 14 = 15 days
+            if (dayCounter < total_days_crawled - 1) {
                 await goToNextDay(page);
                 dayCounter++;
                 currentDateToCrawl = getNextDateString(currentDateToCrawl);
@@ -410,7 +410,8 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                             const day = parseInt(dateParts[0]);
                             const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed in Date
                             const year = parseInt(dateParts[2]);
-                            const dateObj = new Date(year, month, day);
+                            // Use UTC to avoid timezone issues
+                            const dateObj = new Date(Date.UTC(year, month, day));
                             iso_flight_date = dateObj.toISOString();
                         }
                     } catch (error) {
@@ -426,7 +427,8 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                             const day = parseInt(dateParts[0]);
                             const month = parseInt(dateParts[1]) - 1;
                             const year = parseInt(dateParts[2]);
-                            const dateObj = new Date(year, month, day);
+                            // Use UTC to avoid timezone issues
+                            const dateObj = new Date(Date.UTC(year, month, day));
                             iso_flight_date = dateObj.toISOString();
                         }
                     } catch (error) {
@@ -482,7 +484,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
         allResults.push(results);
         
         // Move to next day if not at the end
-        if (dayCounter < 14) { // 0 to 14 = 15 days
+        if (dayCounter < total_days_crawled - 1) {
             console.log(`🔄 Moving to next day...`);
             await goToNextDay(page);
             dayCounter++;
@@ -491,7 +493,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             // Add delay between days to avoid overwhelming the server
             await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
-            console.log(`🏁 Reached end day (15 days total). Crawling complete.`);
+            console.log(`🏁 Reached end day (${total_days_crawled} days total). Crawling complete.`);
             break;
         }
     }

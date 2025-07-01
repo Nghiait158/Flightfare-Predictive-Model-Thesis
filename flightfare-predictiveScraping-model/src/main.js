@@ -191,7 +191,7 @@ async function main(options = {}) {
         return executionResult;
 
     } finally {
-         await delay(20000);
+        //  await delay(20000);
         // Step 8: Cleanup - Always ensure browser is closed
         console.log('\n📋 Step 8: Cleanup and resource management...');
         
@@ -242,7 +242,6 @@ async function main(options = {}) {
             // console.log(`📊 Results obtained: ${executionResult.crawlerResult.results ? '✅' : '❌'}`);
         }
         
-        // console.log('🔚 Main execution finished\n');
     }
 }
 

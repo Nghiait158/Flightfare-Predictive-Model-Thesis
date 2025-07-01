@@ -175,13 +175,13 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
         });
         return flightAircraftMap;
     });
-
+    const TimestartCrawl = Date.now();
     console.log('✈️ Aircraft Type Map:', aircraftTypeMap);
     
     const startDate = new Date(startYear, startMonth, startDay);
 
     const total_days_crawled= 15;
-    
+
     const endDay = new Date(startDate); 
     endDay.setDate(startDate.getDate() + total_days_crawled);
     
@@ -497,7 +497,8 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             break;
         }
     }
-    
+    const TimeEndCrawl = Date.now();
+    console.log(`⏱️ Time crawl: ${TimeEndCrawl - TimestartCrawl} ms`);
     // Return summary of all results
     const summary = {
         total_days_crawled: allResults.length,

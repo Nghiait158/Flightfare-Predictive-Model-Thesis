@@ -1,5 +1,5 @@
 /**
- * @fileoverview Configuration loading and validation utilities
+ * @fileoverview Configuration loading utilities
  */
 
 import { readCSVFile, readJSONFile } from '../utils/fileUtils.js';
@@ -32,47 +32,11 @@ import { AIRPORTS_CSV_PATH, FLIGHT_CONFIG_PATH } from '../constants/paths.js';
  */
 
 /**
- * Validates required fields in flight configuration
- * @param {Object} config - Configuration object to validate
- * @throws {Error} If required fields are missing or invalid
+ * Validates the structure and content of the airports data.
+ * @param {Array<Airport>} airports - The array of airport objects to validate.
+ * @throws {Error} If the airports data is invalid.
  */
-
-
-function validateFlightConfigStructure(config) {
-    const requiredFields = ['departure_airport', 'arrival_airport'];
-    const missingFields = [];
-
-    for (const field of requiredFields) {
-        if (!config[field] || typeof config[field] !== 'string' || config[field].trim() === '') {
-            missingFields.push(field);
-        }
-    }
-
-    if (missingFields.length > 0) {
-        throw new Error(`Missing or invalid required fields in flight config: ${missingFields.join(', ')}`);
-    }
-
-    // Validate search_options if present
-    if (config.search_options) {
-        const { trip_type, find_cheapest, departure_date } = config.search_options;
-        
-        if (trip_type && !['oneway', 'roundtrip'].includes(trip_type)) {
-            throw new Error(`Invalid trip_type: ${trip_type}. Must be 'oneway' or 'roundtrip'`);
-        }
-        
-        if (find_cheapest !== undefined && typeof find_cheapest !== 'boolean') {
-            throw new Error(`Invalid find_cheapest: ${find_cheapest}. Must be boolean`);
-        }
-        
-        if (departure_date && typeof departure_date !== 'string') {
-            throw new Error(`Invalid departure_date: ${departure_date}. Must be string`);
-        }
-    }
-}
-
-// --------------------Validates airport data structure---------------------
 function validateAirportsData(airports) {
-    
     if (!Array.isArray(airports) || airports.length === 0) {
         throw new Error('Airports data must be a non-empty array');
     }
@@ -90,82 +54,41 @@ function validateAirportsData(airports) {
         }
 
         if (missingFields.length > 0) {
-            throw new Error(`Airport at index ${i} missing required fields: ${missingFields.join(', ')}`);
-        }
-
-        // Validate airport code format (should be 3 uppercase letters)
-        if (!/^[A-Z]{3}$/.test(airport.code)) {
-            console.warn(`⚠️ Airport code '${airport.code}' at index ${i} may not follow standard format (3 uppercase letters)`);
+            throw new Error(`Airport at index ${i} is missing required fields: ${missingFields.join(', ')}`);
         }
     }
 }
 
-// -------------------Finds airport by code------------
- 
-function findAirportByCode(airports, code) {
-    return airports.find(airport => 
-        airport.code && airport.code.toUpperCase() === code.toUpperCase()
-    );
-}
-
-// ---------------Validates that departure and arrival airports exist in the airports data---------------
-
-function validateAirportAvailability(flightConfig, airports) {
-    const departureAirport = findAirportByCode(airports, flightConfig.departure_airport);
-    const arrivalAirport = findAirportByCode(airports, flightConfig.arrival_airport);
-
-    if (!departureAirport) {
-        throw new Error(`Departure airport '${flightConfig.departure_airport}' not found in airports database`);
-    }
-
-    if (!arrivalAirport) {
-        throw new Error(`Arrival airport '${flightConfig.arrival_airport}' not found in airports database`);
-    }
-
-    if (departureAirport.code === arrivalAirport.code) {
-        throw new Error('Departure and arrival airports cannot be the same');
-    }
-
-    return { departureAirport, arrivalAirport };
-}
-
-// -----------------------------Loads and validates flight configuration and airports data-----------------------------------
-
+/**
+ * Loads the main configuration file and the airports database.
+ * The main config file is expected to have 'targets' and 'global_settings'.
+ * Airport validation is performed, but target-specific validation is deferred.
+ * @param {string} airportsPath - Path to the airports CSV file.
+ * @param {string} configPath - Path to the main JSON configuration file.
+ * @returns {Promise<object>} An object containing the loaded config and airports list.
+ */
 export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configPath = FLIGHT_CONFIG_PATH) {
     try {
-        
-        // read airport data
+        // Read and validate airport data first
         const airports = readCSVFile(airportsPath);
         validateAirportsData(airports);
 
-        // read fight config
-        const flightConfig = readJSONFile(configPath);
-        validateFlightConfigStructure(flightConfig);
-        console.log(`Flight configuration loaded: ${flightConfig.departure_airport} → ${flightConfig.arrival_airport}`);
+        // Read the main configuration file
+        const config = readJSONFile(configPath);
 
-        const { departureAirport, arrivalAirport } = validateAirportAvailability(flightConfig, airports);
+        // Basic validation for the new structure
+        if (!config.targets || !Array.isArray(config.targets)) {
+            throw new Error("Configuration file must contain a 'targets' array.");
+        }
+        if (!config.global_settings) {
+            console.warn("Configuration file is missing 'global_settings'.");
+        }
 
-        
-        const defaultSearchOptions = {
-            trip_type: 'oneway',
-            find_cheapest: true,
-            departure_date: 'today'
-        };
+        console.log('Configuration and airports loaded successfully.');
 
-        // If there is no previous config, the default is as above
-        // Nếu không có config trc thì mặc định như bên trên 
-        const finalConfig = {
-            ...flightConfig,
-            search_options: {
-                ...defaultSearchOptions,
-                ...flightConfig.search_options
-            }
-        };
         return {
-            flightConfig: finalConfig,
+            ...config,
             airports,
-            departureAirport,
-            arrivalAirport
         };
 
     } catch (error) {

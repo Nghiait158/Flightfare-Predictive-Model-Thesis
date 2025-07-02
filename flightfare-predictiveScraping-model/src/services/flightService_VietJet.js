@@ -17,7 +17,7 @@ import {
     isElementVisible
 } from '../utils/domUtils.js';
 import { log } from 'console';
-import { crawlData_from_VietJetPage } from './crawlData_VietJet.js';
+// import { crawlData_from_VietJetPage } from './crawlData_VietJet.js';
 import { crawlData_byDate_from_VietJetPage } from './crawlData_byDate_from_VietJetPage.js';
 import { appendToJsonFile, appendToCsvFile } from '../utils/fileUtils.js';
 import { RESULT_DIR, FLIGHT_CONFIG_PATH } from '../constants/paths.js';

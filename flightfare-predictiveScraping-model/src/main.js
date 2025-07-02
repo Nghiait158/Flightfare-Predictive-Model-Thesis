@@ -29,219 +29,142 @@ async function main(options = {}) {
         clearScreenshots = true 
     } = options;
     
-    const startTime = Date.now();
+    const overallStartTime = Date.now();
     let browser = null;
-    let page = null;
-    let config = null;
-    
-    const executionResult = {
-        success: false,
-        crawlerResult: null,
-        stats: null,
-        totalDuration: 0,
-        error: null
-    };
+    const allExecutionResults = [];
 
     try {
-        // Header
         console.log('Thesis Trinh Van Trung Nghia');
         console.log('============================================');
         console.log(`Started at: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`);
-        // Xóa screen shot 
+        
         if (clearScreenshots) {
             try {
                 clearDirectory(SCREENSHOT_DIR);
-                // console.log('Screenshots cleared\n');
             } catch (error) {
                 console.warn(`Failed to clear screenshots directory: ${error.message}`);
             }
-        } else {
-            console.log('Skipping screenshots directory');
         }
 
-//---------------------------------------------Load flight configuration and airports------------------------------------------------ 
-// ------------------------------------------Xác định cấu hình cho chuyến bay và sân bay 
-        config = await loadFlightConfig();
-        
-        console.log(`Configuration loaded :`);
-        console.log(`   • Route: ${config.flightConfig.departure_airport} → ${config.flightConfig.arrival_airport}`);
-        console.log(`   • Departure: ${config.departureAirport.city} (${config.departureAirport.airport_name})`);
-        console.log(`   • Arrival: ${config.arrivalAirport.city} (${config.arrivalAirport.airport_name})`);
-        console.log(`   • Search options: ${JSON.stringify(config.flightConfig.search_options, null, 2)}\n`);
+        const config = await loadFlightConfig();
+        const allAirports = config.airports; // Assume loadFlightConfig now returns all airports
 
-// ------------------------------------------------Xác thưc cấu hình cho crawler------------------------------------------------
-        validateCrawlerConfig({
-            flightConfig: config.flightConfig,
-            airports: config.airports
-        });
-        console.log('');
-
-// ------------------------------------------------Launch browser(Khởi động website)------------------------------------------------
-        console.log('Launching browser...');
-        
-        // const browserResult = await launchBrowser(BASE_URL);        
-        const browserResult = await launchBrowser(BASE_URL);
-        browser = browserResult.browser;
-        page = browserResult.page;
-        
-        console.log('Browser launched with:');
-        console.log(`   • Headless: ${BROWSER_CONFIG.HEADLESS}`)
-        console.log(`   • Browser instance: ${browser ? 'Active' : 'Failed'}`);
-        console.log(`   • Page instance: ${page ? 'Active' : 'Failed'}`);
-        console.log(`   • Viewport: ${JSON.stringify(await page.viewport())}\n`);
-
-// ------------------------------------------------Setup browser logging (show log từ trang web)------------------------------------------------
-        console.log('Setting up browser logging...');
-        setupBrowserLogging(page);
-// -------------------------------------------------Run main crawler-------------------------------------------------
-        console.log('Starting main crawler execution...');
-        let crawlerResult;
-        
-        if (useRetry) {
-            crawlerResult = await runCrawlerWithRetry(
-                page, 
-                {
-                    flightConfig: config.flightConfig,
-                    airports: config.airports
-                },
-                {
-                    maxRetries: MAX_RETRIES,
-                    retryDelay: 5000
-                }
-            );
-        } else {
-            // call crawlerServices.js
-            crawlerResult = await runCrawler(page, {
-                flightConfig: config.flightConfig,
-                airports: config.airports
-            });
+        if (!config.targets || !Array.isArray(config.targets)) {
+            throw new Error('Configuration file is missing "targets" array.');
         }
 
-//------------------------ Process results and generate statistics--------------        
-        const stats = getCrawlerStats(crawlerResult);
-        
-        console.log('📊 Execution Statistics:');
-        console.log(`   • Success: ${stats.success ? '✅' : '❌'}`);
-        console.log(`   • Route: ${stats.route}`);
-        console.log(`   • Execution time: ${stats.executionTimeFormatted}`);
-        console.log(`   • Steps completed: ${stats.stepsCompleted}`);
-        console.log(`   • Screenshots taken: ${stats.screenshotsTaken}`);
-        console.log(`   • Results available: ${stats.hasResults ? '✅' : '❌'}`);
-        console.log(`   • Start time: ${stats.startTime}`);
-        console.log(`   • End time: ${stats.endTime}`);
+        const enabledTargets = config.targets.filter(t => t.enabled);
+        console.log(`\nFound ${enabledTargets.length} enabled target(s) to crawl.`);
 
-        if (crawlerResult.results) {
-            console.log('\n📋 Crawler Results Summary:');
-            const results = crawlerResult.results;
-            console.log(`   • Source: ${results.source || 'Unknown'}`);
-            console.log(`   • Timestamp: ${results.timestamp || 'N/A'}`);
+        for (const target of enabledTargets) {
+            const targetStartTime = Date.now();
+            console.log(`\n--- Starting crawl for target: [${target.id}] ---`);
+            console.log(`Route: ${target.search_options.departure_airport} → ${target.search_options.arrival_airport}`);
             
-            if (results.total_flights !== undefined) {
-                console.log(`   • Total flights: ${results.total_flights}`);
-            }
-            if (results.url) {
-                console.log(`   • Results URL: ${results.url}`);
+            let executionResult = {
+                targetId: target.id,
+                success: false,
+                duration: 0,
+                error: null,
+            };
+
+            try {
+                const browserResult = await launchBrowser();
+                browser = browserResult.browser;
+                const page = browserResult.page;
+
+                console.log('Browser launched for target.');
+                setupBrowserLogging(page);
+
+                // Attach all airports to the target config for the handler
+                const crawlerConfig = {
+                    ...target,
+                    airports: allAirports
+                };
+
+                // Validate config for this specific target
+                validateCrawlerConfig({
+                    flightConfig: crawlerConfig.search_options,
+                    airports: allAirports
+                });
+
+                let crawlerResult;
+                if (useRetry) {
+                    crawlerResult = await runCrawlerWithRetry(
+                        page,
+                        crawlerConfig,
+                        {
+                            maxRetries: config.global_settings.max_retries || 2,
+                            retryDelay: config.global_settings.retry_delay_ms || 5000
+                        }
+                    );
+                } else {
+                    crawlerResult = await runCrawler(page, crawlerConfig);
+                }
+
+                if (crawlerResult.success) {
+                    const stats = getCrawlerStats(crawlerResult);
+                    console.log('📊 Execution Statistics:');
+                    console.log(`   • Success: ${stats.success ? '✅' : '❌'}`);
+                    console.log(`   • Route: ${stats.route}`);
+                    console.log(`   • Execution time: ${stats.executionTimeFormatted}`);
+                    console.log(`   • Results: ${stats.hasResults ? 'Available' : 'None'}`);
+                    executionResult.success = true;
+                } else {
+                    executionResult.error = crawlerResult.error || 'Crawler failed without a specific error message.';
+                }
+
+            } catch (error) {
+                console.error(`\n❌ Critical error during crawl for target [${target.id}]!`);
+                console.error(`🔥 Error: ${error.message}`);
+                executionResult.error = error.message;
+            } finally {
+                if (browser) {
+                    await closeBrowser(browser);
+                    console.log('Browser closed for target.');
+                    browser = null;
+                }
+                executionResult.duration = (Date.now() - targetStartTime) / 1000;
+                console.log(`--- Finished target [${target.id}] in ${executionResult.duration.toFixed(2)}s ---`);
+                allExecutionResults.push(executionResult);
             }
         }
 
-        // Update execution result
-        executionResult.success = crawlerResult.success;
-        executionResult.crawlerResult = crawlerResult;
-        executionResult.stats = stats;
-        executionResult.totalDuration = Date.now() - startTime;
+        // Auto-increment date logic
+        // This part needs to be thoughtful. We'll update all enabled targets.
+        console.log('\n📋 Updating departure dates for next run...');
+        let updated = false;
+        config.targets.forEach(target => {
+            if (target.enabled) {
+                const originalDate = target.search_options.departure_date;
+                incrementDepartureDate(target.search_options);
+                console.log(`   • [${target.id}] date updated: ${originalDate} → ${target.search_options.departure_date}`);
+                updated = true;
+            }
+        });
 
-        if (crawlerResult.success) {
-            console.log('\n🎉 Main execution completed !');
-            console.log('==========================================');
-            console.log(`⏱️ Total execution time: ${(executionResult.totalDuration / 1000).toFixed(2)} seconds`);
-            console.log(`📸 Total screenshots: ${crawlerResult.screenshots.length}`);
-            console.log(`📊 Results: ${crawlerResult.results ? 'Available' : 'None'}`);
-        } else {
-            console.log('\n⚠️ Main execution completed with issues');
-            console.log('=======================================');
-            console.log(`❌ Crawler error: ${crawlerResult.error}`);
-            console.log(`⏱️ Execution time: ${(executionResult.totalDuration / 1000).toFixed(2)} seconds`);
+        if (updated) {
+            await fs.promises.writeFile(FLIGHT_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf8');
+            console.log(`   • Configuration saved to ${FLIGHT_CONFIG_PATH}`);
         }
-
-        return executionResult;
 
     } catch (error) {
-        console.error('\n❌ Critical error in main execution!');
-        console.error('====================================');
+        console.error('\n❌ Critical error in main execution manager!');
         console.error(`🔥 Error: ${error.message}`);
         console.error(`⚙️ Stack trace: ${error.stack}`);
-        console.error(`⏱️ Failed after: ${((Date.now() - startTime) / 1000).toFixed(2)} seconds`);
-
-        // Try to take error screenshot if page is available
-        if (page) {
-            try {
-                console.error('📸 Attempting to take error screenshot...');
-                const errorScreenshot = await takeScreenshot(page, 'main-critical-error');
-                console.error(`📸 Error screenshot saved: ${errorScreenshot}`);
-            } catch (screenshotError) {
-                console.error(`📸 Failed to take error screenshot: ${screenshotError.message}`);
-            }
-        }
-
-        // Update execution result with error
-        executionResult.success = false;
-        executionResult.error = error.message;
-        executionResult.totalDuration = Date.now() - startTime;
-
-        return executionResult;
-
+        // Ensure to return a non-zero exit code on critical failure
+        process.exit(1);
     } finally {
-        //  await delay(20000);
-        // Step 8: Cleanup - Always ensure browser is closed
-        console.log('\n📋 Step 8: Cleanup and resource management...');
+        if (browser) await closeBrowser(browser); // Final check for any unclosed browser
         
-        if (browser) {
-            try {
-                await closeBrowser(browser);
-                console.log('✅ Browser closed ');
-            } catch (closeError) {
-                console.error(`⚠️ Error closing browser: ${closeError.message}`);
-            }
-        } else {
-            console.log('ℹ️ No browser instance to close');
-        }
-// -------------Incr month in flight-config.json-------------
-        if (config && config.flightConfig) {
-            try {
-                console.log('\n📋 Calling incrementDepartureMonth before final exit...');
-                const originalDate = config.flightConfig.search_options.departure_date;
-                
-                // Cập nhật ngày khởi hành trong đối tượng config
-                incrementDepartureMonth(config.flightConfig);
-                
-                console.log(`   • Original departure date: ${originalDate}`);
-                console.log(`   • New departure date: ${config.flightConfig.search_options.departure_date}`);
-                
-                // Ghi lại cấu hình đã cập nhật vào tệp
-                await fs.promises.writeFile(FLIGHT_CONFIG_PATH, JSON.stringify(config.flightConfig, null, 2), 'utf8');
-                console.log(`   • Configuration saved to ${FLIGHT_CONFIG_PATH}`);
-            } catch (error) {
-                console.error('❌ Error updating and saving flight configuration:', error);
-            }
-        } else {
-            console.log('ℹ️ Flight configuration not available for month increment, skipping.');
-        }
-        // await delay(20000);
-
-// ------------------------------------------------------------------
-        // Final summary
-        const finalDuration = (Date.now() - startTime) / 1000;
-        console.log('\n Final Summary');
-        console.log('================');
-        // console.log(`Overall success: ${executionResult.success ? '✅' : '❌'}`);
-        console.log(`Total runtime: ${finalDuration.toFixed(2)} seconds`);
-        console.log(`Completed at: ${new Date().toISOString()}`);
-        
-        if (executionResult.success && executionResult.crawlerResult) {
-            // console.log(` Crawling success: ✅`);
-            // console.log(`📊 Results obtained: ${executionResult.crawlerResult.results ? '✅' : '❌'}`);
-        }
-        
+        const finalDuration = (Date.now() - overallStartTime) / 1000;
+        console.log('\n================ Final Summary ================');
+        allExecutionResults.forEach(res => {
+            console.log(`[${res.targetId}]: ${res.success ? '✅ SUCCESS' : '❌ FAILURE'} in ${res.duration.toFixed(2)}s. ${res.error ? `Error: ${res.error}` : ''}`);
+        });
+        console.log('============================================');
+        console.log(`✅ All tasks completed in ${finalDuration.toFixed(2)} seconds.`);
+        console.log(`Completed at: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`);
     }
 }
 
@@ -306,28 +229,34 @@ async function entryPoint() {
 // }
 
 
-function incrementDepartureMonth(jsonData) { // Tên hàm vẫn giữ nguyên nhưng chức năng thay đổi
-    if (jsonData && jsonData.search_options && jsonData.search_options.departure_date) {
-        // Chuyển đổi chuỗi ngày "DD/MM/YYYY" sang đối tượng Date
-        // Lưu ý: Đối tượng Date trong JS có tháng bắt đầu từ 0 (0-11)
-        let [day, month, year] = jsonData.search_options.departure_date.split('/').map(Number);
+function incrementDepartureDate(searchOptions) { // Renamed from incrementDepartureMonth
+    if (searchOptions && searchOptions.departure_date) {
+        // Current format is DD/MM/YYYY
+        let [day, month, year] = searchOptions.departure_date.split('/').map(Number);
         
-        // Tạo đối tượng Date. Trừ 1 từ tháng vì Date object sử dụng 0-indexed month.
+        // JS Date object month is 0-indexed (0-11)
         let currentDate = new Date(year, month - 1, day);
 
+        const daysToIncrease = 2; // This could be moved to global_settings in config
+        currentDate.setDate(currentDate.getDate() + daysToIncrease);
 
-        const dayNeedToIncrease=2;
-        currentDate.setDate(currentDate.getDate() + dayNeedToIncrease);
-
-        // Lấy lại các thành phần ngày, tháng, năm từ đối tượng Date đã cập nhật
         const newDay = String(currentDate.getDate()).padStart(2, '0');
-        const newMonth = String(currentDate.getMonth() + 1).padStart(2, '0'); // Cộng 1 vì tháng là 0-indexed
+        const newMonth = String(currentDate.getMonth() + 1).padStart(2, '0'); // Convert back to 1-indexed for string
         const newYear = currentDate.getFullYear();
 
-        // Gán lại chuỗi ngày đã cập nhật vào jsonData
-        jsonData.search_options.departure_date = `${newDay}/${newMonth}/${newYear}`;
+        searchOptions.departure_date = `${newDay}/${newMonth}/${newYear}`;
+        
+        // Also increment return_date if it exists
+        if (searchOptions.return_date) {
+            let [retDay, retMonth, retYear] = searchOptions.return_date.split('/').map(Number);
+            let returnDateObj = new Date(retYear, retMonth - 1, retDay);
+            returnDateObj.setDate(returnDateObj.getDate() + daysToIncrease);
+            const newRetDay = String(returnDateObj.getDate()).padStart(2, '0');
+            const newRetMonth = String(returnDateObj.getMonth() + 1).padStart(2, '0');
+            const newRetYear = returnDateObj.getFullYear();
+            searchOptions.return_date = `${newRetDay}/${newRetMonth}/${newRetYear}`;
+        }
     }
-    return jsonData;
 }
 // ------------------------------------------------------------------------------------------
 

@@ -1,9 +1,164 @@
 {
-  "departure_airport": "SGN",
-  "arrival_airport": "HAN",
-  "search_options": {
-    "trip_type": "oneway",
-    "find_cheapest": false,
-    "departure_date": "04/07/2025"
-  }
+  "targets": [
+    {
+      "id": "vietjet",
+      "baseUrl": "https://www.vietjetair.com/vi",
+      "enabled": true,
+      "search_options": {
+        "trip_type": "OneWay",
+        "departure_airport": "SGN",
+        "arrival_airport": "HAN",
+        "departure_date": "01/08/2025",
+        "return_date": null,
+        "passengers": {
+          "adults": 1,
+          "children": 0,
+          "infants": 0
+        }
+      }
+    },
+    {
+      "id": "bamboo",
+      "baseUrl": "https://www.bambooairways.com/vn-vi/",
+      "enabled": false,
+      "search_options": {
+        "trip_type": "RoundTrip",
+        "departure_airport": "DAD",
+        "arrival_airport": "SGN",
+        "departure_date": "15/01/2025",
+        "return_date": "25/01/2025",
+        "passengers": {
+          "adults": 2,
+          "children": 1,
+          "infants": 0
+        }
+      }
+    }
+  ],
+  "global_settings": {
+    "max_retries": 3,
+    "retry_delay_ms": 5000
+  },
+  "airports": [
+    {
+      "code": "SGN",
+      "city": "Tp. Hồ Chí Minh",
+      "airport_name": "Sân bay quốc tế Tân Sơn Nhất",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "HAN",
+      "city": "Hà Nội",
+      "airport_name": "Sân bay quốc tế Nội Bài",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "DAD",
+      "city": "Đà Nẵng",
+      "airport_name": "Sân bay quốc tế Đà Nẵng",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "CXR",
+      "city": "Khánh Hòa",
+      "airport_name": "Sân bay quốc tế Cam Ranh",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "PQC",
+      "city": "Phú Quốc",
+      "airport_name": "Sân bay quốc tế Phú Quốc",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "VDO",
+      "city": "Quảng Ninh",
+      "airport_name": "Sân bay quốc tế Vân Đồn",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "HUI",
+      "city": "Huế",
+      "airport_name": "Sân bay Phú Bài",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "HPH",
+      "city": "Hải Phòng",
+      "airport_name": "Sân bay Cát Bi",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "VDH",
+      "city": "Đồng Hới",
+      "airport_name": "Sân bay Đồng Hới",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "VII",
+      "city": "Vinh",
+      "airport_name": "Sân bay Vinh",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "THD",
+      "city": "Thanh Hóa",
+      "airport_name": "Sân bay Thọ Xuân",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "DLI",
+      "city": "Đà Lạt",
+      "airport_name": "Sân bay Liên Khương",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "BMV",
+      "city": "Buôn Ma Thuột",
+      "airport_name": "Sân bay Buôn Ma Thuột",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "PLE",
+      "city": "Pleiku",
+      "airport_name": "Sân bay Pleiku",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "UIH",
+      "city": "Quy Nhơn",
+      "airport_name": "Sân bay Phù Cát",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "TBB",
+      "city": "Tuy Hòa",
+      "airport_name": "Sân bay Tuy Hòa",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "VCA",
+      "city": "Cần Thơ",
+      "airport_name": "Sân bay Cần Thơ",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "CAH",
+      "city": "Cà Mau",
+      "airport_name": "Sân bay Cà Mau",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "VKG",
+      "city": "Rạch Giá",
+      "airport_name": "Sân bay Rạch Giá",
+      "country": "Việt Nam"
+    },
+    {
+      "code": "DIN",
+      "city": "Điện Biên",
+      "airport_name": "Sân bay Điện Biên Phủ",
+      "country": "Việt Nam"
+    }
+  ]
 }

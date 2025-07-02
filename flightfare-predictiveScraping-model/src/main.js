@@ -316,7 +316,7 @@ function incrementDepartureMonth(jsonData) { // Tên hàm vẫn giữ nguyên nh
         let currentDate = new Date(year, month - 1, day);
 
 
-        const dayNeedToIncrease=15;
+        const dayNeedToIncrease=2;
         currentDate.setDate(currentDate.getDate() + dayNeedToIncrease);
 
         // Lấy lại các thành phần ngày, tháng, năm từ đối tượng Date đã cập nhật

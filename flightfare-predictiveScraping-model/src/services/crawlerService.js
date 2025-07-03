@@ -10,47 +10,201 @@ import {
     validatePageLoad 
 } from '../utils/browserUtils.js';
 
-import { crawlVietjet } from '../handlers/vietjetHandler.js';
 
-const siteHandlers = {
-    'vietjet': crawlVietjet,
-    // 'bamboo': crawlBamboo, // Add new handlers here
-};
+import { 
+    performFlightSearch_VietJet,
+    selectDepartureAirport,
+    selectArrivalAirport,
+    selectFlightDate,
+    submitSearchForm,
+    getFlightResults
+} from '../services/flightService_VietJet.js';
 
 // const vietjet_URL = 'https://www.vietjetair.com/vi/pages/bao-hiem-du-lich-sky-care-1681121104781';
 const vietjet_URL = 'https://www.vietjetair.com/vi';
 const vietnamairlines_URL = 'https://www.vietnamairlines.com/vn/en';
 
 // call from main.js
-export async function runCrawler(page, config) {
-    const handler = siteHandlers[config.id];
-    if (!handler) {
-        throw new Error(`No handler found for site ID: '${config.id}'`);
-    }
+export async function runCrawler(page, { flightConfig, airports }) {
+    const startTime = Date.now();
+    const screenshots = [];
+    const steps = [];
+    
+    const result = {
+        success: false,
+        route: `${flightConfig.departure_airport} → ${flightConfig.arrival_airport}`,
+        duration: 0,
+        results: null,
+        screenshots: [],
+        steps: [],
+        error: null,
+        metadata: {
+            startTime: new Date().toISOString(),
+            url: vietjet_URL,
+            userAgent: await page.evaluate(() => navigator.userAgent),
+            viewport: await page.viewport()
+        }
+    };
 
-    // Delegate the entire crawling process to the specific handler
     try {
-        const result = await handler(page, {
-            ...config,
-            airports: config.airports, // Make sure airports are passed down
-            flightConfig: config.search_options, // Pass search_options as flightConfig for compatibility
-            baseUrl: config.baseUrl
-        });
-        return result;
-    } catch (error) {
-        console.error(`\n❌ Unhandled error in ${config.id} handler: ${error.message}`);
-        console.error(`⚙️ Stack trace: ${error.stack}`);
+        console.log(`Target : ${vietjet_URL}\n`);
+
+        // set up return log
+        setupBrowserLogging(page);
+        steps.push('Browser logging configured');
+
+        // ----------------------------------------------------------------------------------------------------
+        //  Navigate to VietJet page
+        console.log('Navigating to target website...');
         
-        // Try to take a final screenshot on error
-        try {
-            const errorScreenshotPath = await takeScreenshot(page, `critical-error-${config.id}`);
-            console.error(`📸 Error screenshot saved to ${errorScreenshotPath}`);
-        } catch (screenshotError) {
-            console.error(`📸 Could not take error screenshot: ${screenshotError.message}`);
+        // go to VietjetPage
+        await gotoPage(page, vietjet_URL, {
+            waitUntil: 'networkidle2',
+            timeout: 30000
+        });
+
+        // Validate page load
+        const pageValid = await validatePageLoad(page);
+        if (!pageValid) {
+            throw new Error('Page failed to load properly');
         }
         
-        // Re-throw the error to be caught by the retry logic
-        throw error;
+        steps.push('Navigation completed');
+// --------------------------------------------------------------------------------------------------------
+        // Take initial screenshot
+        const initialScreenshot = await takeScreenshot(page, 'crawler-initial-page');
+        screenshots.push(initialScreenshot);
+        steps.push('Initial screenshot captured');
+
+// ---------------------------------------------------------------------------------------------------
+        // Handle cookie popups
+        console.log('Handling cookie popups and consent dialogs...');
+        const cookieResult = await handleCookiePopups(page, 'Main crawler: ');
+        
+        if (cookieResult.firstButton || cookieResult.cookieButton) {
+            console.log('Cookie popups handled successfully');
+            await delay(DELAY_MEDIUM);
+            
+            // Take screenshot after cookie handling
+            const cookieScreenshot = await takeScreenshot(page, 'crawler-after-cookies');
+            screenshots.push(cookieScreenshot);
+        } else {
+            console.log('No cookie popups found');
+        }
+        
+        steps.push('Cookie handling completed');
+        console.log('');
+
+
+// -----------------------------------------------------------------------------------------------------------
+        // Get airport information
+        const departureAirport = airports.find(ap => ap.code === flightConfig.departure_airport);
+        const arrivalAirport = airports.find(ap => ap.code === flightConfig.arrival_airport);
+
+        if (!departureAirport) {
+            throw new Error(`Departure airport '${flightConfig.departure_airport}' not found in airports database`);
+        }
+
+        if (!arrivalAirport) {
+            throw new Error(`Arrival airport '${flightConfig.arrival_airport}' not found in airports database`);
+        }
+
+        console.log(`✅ Departure: ${departureAirport.city} (${departureAirport.code}) - ${departureAirport.airport_name}`);
+        console.log(`✅ Arrival: ${arrivalAirport.city} (${arrivalAirport.code}) - ${arrivalAirport.airport_name}`);
+        steps.push('Airport information resolved');
+        console.log('');
+
+// -------------------------------------------------------------------------------------------------------------------
+        // Execute flight search workflow
+        // console.log('Executing flight search workflow...');
+
+
+        const searchResult = await performFlightSearch_VietJet(
+            page, 
+            departureAirport, 
+            arrivalAirport, 
+            flightConfig.search_options
+        );
+
+        if (!searchResult.success) {
+            throw new Error(`Flight search failed: ${searchResult.error}`);
+        }
+
+        steps.push('Flight search workflow executed');
+        result.results = searchResult.results;
+        console.log('');
+
+        // Step 7: Take final screenshot
+        console.log('📋 Step 7: Taking final results screenshot...');
+        const finalScreenshot = await takeScreenshot(page, 'crawler-final-results');
+        screenshots.push(finalScreenshot);
+        steps.push('Final screenshot captured');
+        console.log('✅ Final results screenshot captured\n');
+
+        // Step 8: Process and validate results
+        console.log('📋 Step 8: Processing and validating results...');
+        
+        if (result.results) {
+            console.log('📊 Results Summary:');
+            console.log(`   • Source: ${result.results.source || 'Unknown'}`);
+            console.log(`   • Timestamp: ${result.results.timestamp || 'N/A'}`);
+            
+            if (result.results.total_flights !== undefined) {
+                console.log(`   • Total flights found: ${result.results.total_flights}`);
+            }
+            
+            if (result.results.url) {
+                console.log(`   • Results URL: ${result.results.url}`);
+            }
+            
+            steps.push('Results processed and validated');
+        } else {
+            console.log('⚠️ No flight results obtained, but search workflow completed');
+            steps.push('Results processing completed (no data)');
+        }
+
+        // Calculate final metrics
+        const endTime = Date.now();
+        result.duration = endTime - startTime;
+        result.success = true;
+        result.screenshots = screenshots;
+        result.steps = steps;
+
+        console.log('\n🎉 Crawler execution completed successfully!');
+        console.log('==========================================');
+        console.log(`⏱️ Total duration: ${(result.duration / 1000).toFixed(2)} seconds`);
+        console.log(`📸 Screenshots taken: ${screenshots.length}`);
+        console.log(`✅ Steps completed: ${steps.length}`);
+        console.log(`📊 Results: ${result.results ? 'Available' : 'None'}`);
+
+        return result;
+
+    } catch (error) {
+        console.error('\n❌ Crawler execution failed!');
+        console.error('===============================');
+        console.error(`🔥 Error: ${error.message}`);
+        console.error(`⏱️ Failed after: ${((Date.now() - startTime) / 1000).toFixed(2)} seconds`);
+        console.error(`✅ Steps completed: ${steps.length}`);
+
+        // Take error screenshot
+        try {
+            const errorScreenshot = await takeScreenshot(page, 'crawler-error');
+            screenshots.push(errorScreenshot);
+            console.error(`📸 Error screenshot: ${errorScreenshot}`);
+        } catch (screenshotError) {
+            console.error(`📸 Failed to take error screenshot: ${screenshotError.message}`);
+        }
+
+        // Update result with error information
+        result.success = false;
+        result.error = error.message;
+        result.duration = Date.now() - startTime;
+        result.screenshots = screenshots;
+        result.steps = steps;
+        result.metadata.errorTime = new Date().toISOString();
+        result.metadata.errorStack = error.stack;
+
+        return result;
     }
 }
 
@@ -66,7 +220,7 @@ export async function runCrawlerWithRetry(page, config, options = {}) {
         try {
             // Nếu lần thứ 2 retry:
             if (attempt > 0) {
-                console.log(`\nRetry attempt ${attempt}/${maxRetries} for site '${config.id}'`);
+                console.log(`\nRetry attempt ${attempt}/${maxRetries}`);
                 console.log('================================');
                 await delay(retryDelay);
             }
@@ -75,23 +229,22 @@ export async function runCrawlerWithRetry(page, config, options = {}) {
             
             if (result.success) {
                 if (attempt > 0) {
-                    console.log(`✅ Crawler for '${config.id}' succeeded on attempt ${attempt + 1}`);
+                    console.log(`✅ Crawler succeeded on attempt ${attempt + 1}`);
                 }
                 return result;
             } else {
-                // This block might not be reached if handlers always throw errors on failure
-                lastError = new Error(result.error || `Crawler for '${config.id}' failed without specific error`);
+                lastError = new Error(result.error || 'Crawler failed without specific error');
             }
 
         } catch (error) {
             lastError = error;
-            console.error(`❌ Attempt ${attempt + 1} for '${config.id}' failed: ${error.message}`);
+            console.error(`❌ Attempt ${attempt + 1} failed: ${error.message}`);
         }
 
         attempt++;
     }
 
-    console.error(`❌ All ${maxRetries + 1} attempts for '${config.id}' failed. Last error: ${lastError.message}`);
+    console.error(`❌ All ${maxRetries + 1} attempts failed. Last error: ${lastError.message}`);
     throw lastError;
 }
 

@@ -13,31 +13,29 @@ import { DELAY_SHORT } from '../constants/constants.js';
  */
 function findClickablePriceOptions() {
     const options = [];
-    // Find all elements containing text that looks like a price part (p or h6).
-    const priceElements = Array.from(document.querySelectorAll('p, h6'));
+    // Select all divs on the page. This is a broad starting point.
+    const allDivs = document.querySelectorAll('div');
 
-    priceElements.forEach(el => {
-        const text = el.textContent.trim();
-        // A valid price part is a number, possibly with commas, and typically longer than 3 chars (e.g., "1,240" or "4,090,000")
-        // This helps filter out other numbers on the page.
-        if (/^[\d,]+$/.test(text) && text.length >= 3) {
-            // The container of the price text (e.g., <div class="jss2768">)
-            let priceTextContainer = el.parentElement;
-            if (!priceTextContainer) return;
+    allDivs.forEach(div => {
+        // A price container typically has two <p> tags as direct children.
+        if (div.children.length >= 2 && div.children[0].tagName === 'P' && div.children[1].tagName === 'P') {
+            const p1 = div.children[0];
+            const p2 = div.children[1];
 
-            // The actual clickable element is usually the parent of that container.
-            let clickableContainer = priceTextContainer.parentElement;
-            if (!clickableContainer) return;
+            const p1Text = p1.textContent.trim();
+            const p2Text = p2.textContent.trim();
 
-            // A robust check: the container's text content should include "VND" but not "Hết chỗ".
-            const containerText = clickableContainer.textContent || '';
-            const isSoldOut = containerText.includes('Hết chỗ');
-            const hasVND = containerText.includes('VND');
-
-            if (hasVND && !isSoldOut) {
-                // Ensure we don't add duplicates.
-                if (!options.includes(clickableContainer)) {
-                    options.push(clickableContainer);
+            // Check if the text content matches the price pattern (e.g., "1,290" and "000 ").
+            if (/^[\d,]+$/.test(p1Text) && p2Text.includes('')) {
+                // The parent of this div is the actual clickable element.
+                const clickableContainer = div.parentElement;
+                
+                // Ensure the container is valid and not already added.
+                if (clickableContainer && clickableContainer.tagName === 'DIV' && !options.includes(clickableContainer)) {
+                    // A valid container should also have a sibling element for the dropdown arrow, often a <span>.
+                    if (clickableContainer.children.length > 1) {
+                         options.push(clickableContainer);
+                    }
                 }
             }
         }
@@ -182,7 +180,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
     
     const startDate = new Date(startYear, startMonth, startDay);
 
-    const total_days_crawled= 2;
+    const total_days_crawled= 15;
 
     const endDay = new Date(startDate); 
     endDay.setDate(startDate.getDate() + total_days_crawled);
@@ -263,33 +261,6 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
         for (let i = 0; i < priceOptionsCount; i++) {
             // console.log(`PROCESSING PRICE OPTION ${i + 1}/${priceOptionsCount}`);
             
-            // --- Step 1: Determine the ticket class based on the element's column position ---
-            // This is more reliable than scraping the class name from the details panel.
-            const ticketClass = await page.evaluate((findFuncStr, index) => {
-                const fareClasses = ['Business', 'Skyboss', 'Deluxe', 'Eco'];
-                const allClickableOptions = eval(`(${findFuncStr})()`);
-                const clickedColumn = allClickableOptions[index];
-
-                if (!clickedColumn) return 'Unknown';
-
-                // The container of all price columns is the parent of the clicked column.
-                const priceColumnsContainer = clickedColumn.parentElement;
-                if (!priceColumnsContainer) return 'Unknown';
-
-                // Get all columns (including non-clickable, "Hết chỗ" ones) by looking at all children of the container.
-                const allColumnsInRow = Array.from(priceColumnsContainer.children);
-
-                // Find the index of our clicked column within ALL of its siblings.
-                const columnIndex = allColumnsInRow.findIndex(col => col === clickedColumn);
-
-                // Map the true column index to the fare class.
-                if (columnIndex > -1 && columnIndex < fareClasses.length) {
-                    return fareClasses[columnIndex];
-                }
-                return 'Unknown';
-
-            }, findClickablePriceOptions.toString(), i);
-            
             // Rebuild aircraft type map for current page state (to capture dynamic content)
             const currentAircraftTypeMap = await page.evaluate(() => {
                 const flightAircraftMap = {};
@@ -364,121 +335,114 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             await new Promise(resolve => setTimeout(resolve, DELAY_SHORT)); 
 
             // Extract comprehensive flight data including the clicked price
-            const flightData = await page.evaluate((departure_airport, arrival_airport, aircraftTypeMap, crawlDate, determinedClass) => {
-                let bookingInfoContainer = null;
+            const flightData = await page.evaluate((departure_airport, arrival_airport, clickedPrice, aircraftTypeMap, crawlDate) => {
+                // The booking info is consistently in the 4th column of the main grid
+                const bookingInfoContainer = document.querySelector('div.MuiGrid-grid-md-4');
+                if (!bookingInfoContainer) return null;
 
-                // Find the booking information container robustly, without relying on jss* classes.
-                // Method 1: Find by the main header "Thông tin đặt chỗ".
-                const allH3s = document.querySelectorAll('h3');
-                for (const h3 of allH3s) {
-                    if (h3.textContent.trim().includes('Thông tin đặt chỗ')) {
-                        // The container is usually a few levels up from the header.
-                        let parent = h3.parentElement;
-                        for (let i = 0; i < 3; i++) {
-                            if (parent && parent.children.length > 1 && parent.textContent.includes('Tổng tiền')) {
-                                bookingInfoContainer = parent;
-                                break;
-                            }
-                            if (parent) parent = parent.parentElement;
-                        }
-                        if (bookingInfoContainer) break;
-                    }
-                }
-
-                // Method 2: Fallback to finding the "Tổng tiền" element directly if the header is not found.
-                if (!bookingInfoContainer) {
-                    const allH4s = document.querySelectorAll('h4');
-                    for (const h4 of allH4s) {
-                        if (h4.textContent.trim().includes('Tổng tiền')) {
-                            // The container is likely the grandparent of the "Tổng tiền" h4.
-                            if (h4.parentElement && h4.parentElement.parentElement) {
-                                bookingInfoContainer = h4.parentElement.parentElement;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (!bookingInfoContainer) {
-                    return { error: 'Could not find the booking details panel.' };
-                }
-
-                // --- Once the container is found, extract all details from it ---
-
+                // Extract total price (Tổng tiền)
                 let total_price = null;
-                const detailsText = bookingInfoContainer.textContent || '';
-                
-                // 1. Extract Total Price ("Tổng tiền")
                 const h4Elements = bookingInfoContainer.querySelectorAll('h4');
                 for (const h4 of h4Elements) {
                     if (h4.textContent.trim().includes('Tổng tiền')) {
                         const priceEl = h4.nextElementSibling;
-                        if (priceEl && priceEl.textContent) {
+                        if (priceEl && priceEl.textContent.trim() !== '0') {
                             total_price = priceEl.textContent.trim();
                             break;
                         }
                     }
                 }
+                
+                // Fallback: If "Tổng tiền" is 0 or not found, try getting the price from the "Chuyến đi" section
+                if (!total_price || total_price === '0 ') {
+                    const tripPriceEl = Array.from(bookingInfoContainer.querySelectorAll('h4')).find(el => 
+                        el.textContent.includes('') && 
+                        el.previousElementSibling && 
+                        el.previousElementSibling.textContent.includes('Chuyến đi')
+                    );
+                    if (tripPriceEl) total_price = tripPriceEl.textContent.trim();
+                }
+                
+                // If no valid total price is found, abort
+                if (!total_price || total_price === '0 ') return null;
 
-                // If no valid total price is found, abort.
-                if (!total_price || total_price === '0' || total_price === '0 VND') {
-                     return { error: 'Could not extract a valid total price.' };
+                // Extract detailed flight information
+                let flight_number = null;
+                let departure_time = null;
+                let arrival_time = null;
+                let classes = null;
+                let departure_date = null;
+                let aircraft_type = null;
+
+                const detailsText = bookingInfoContainer.textContent;
+                
+                // Extract flight number (VJxxxx)
+                const flightMatch = detailsText.match(/(VJ\d+)/);
+                if (flightMatch) flight_number = flightMatch[1];
+
+                // Look up aircraft type from the map
+                if (flight_number && aircraftTypeMap[flight_number]) {
+                    aircraft_type = aircraftTypeMap[flight_number];
                 }
 
-                // 2. Extract other details using robust regex on the container's text content.
-                let flight_number = null, departure_time = null, arrival_time = null, classes = null;
-
-                // Regex to find "HH:MM - HH:MM | VJxxxx | ClassName"
-                const flightInfoMatch = detailsText.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})\s*\|\s*(VJ\d+)\s*\|\s*([a-zA-Z]+)/);
-                if (flightInfoMatch) {
-                    departure_time = flightInfoMatch[1];
-                    arrival_time = flightInfoMatch[2];
-                    flight_number = flightInfoMatch[3];
-                    classes = flightInfoMatch[4];
-                } else {
-                    // Fallback to individual regex if the combined one fails
-                    const timeMatch = detailsText.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
-                    if (timeMatch) {
-                        departure_time = timeMatch[1];
-                        arrival_time = timeMatch[2];
-                    }
-
-                    const flightMatch = detailsText.match(/(VJ\d+)/);
-                    if (flightMatch) flight_number = flightMatch[1];
-
-                    const classMatch = detailsText.match(/(Skyboss|Business|Deluxe|Eco)/i);
-                    if (classMatch) classes = classMatch[1];
+                // Extract departure and arrival times (HH:MM - HH:MM)
+                const timeMatch = detailsText.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
+                if (timeMatch) {
+                    departure_time = timeMatch[1];
+                    arrival_time = timeMatch[2];
                 }
 
-                // **OVERWRITE** the scraped class with the one determined by column position for reliability.
-                if (determinedClass !== 'Unknown') {
-                    classes = determinedClass;
-                }
+                // Extract flight class (Eco, Business, Deluxe, Skyboss)
+                const classMatch = detailsText.match(/(Skyboss|Business|Deluxe|Eco)/i);
+                if (classMatch) classes = classMatch[1];
 
-                // 3. Look up aircraft type from the pre-built map
-                let aircraft_type = (flight_number && aircraftTypeMap[flight_number]) ? aircraftTypeMap[flight_number] : null;
+                // Extract departure date from webpage (for verification only)
+                const dateMatch = detailsText.match(/T\d+,\s*(\d{2}\/\d{2}\/\d{4})/);
+                if (dateMatch) departure_date = dateMatch[1];
 
-                // 4. Get flight date from crawl date
+                // Use crawl date as primary source for flight_date (more reliable)
+                // Convert crawl date (DD/MM/YYYY) to ISO string
                 let iso_flight_date = null;
                 if (crawlDate) {
                     try {
                         const dateParts = crawlDate.split('/');
                         if (dateParts.length === 3) {
                             const day = parseInt(dateParts[0]);
-                            const month = parseInt(dateParts[1]) - 1; // JS month is 0-indexed
+                            const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed in Date
                             const year = parseInt(dateParts[2]);
-                            iso_flight_date = new Date(Date.UTC(year, month, day)).toISOString();
+                            // Use UTC to avoid timezone issues
+                            const dateObj = new Date(Date.UTC(year, month, day));
+                            iso_flight_date = dateObj.toISOString();
                         }
-                    } catch (e) { /* ignore */ }
+                    } catch (error) {
+                        console.warn('Failed to convert crawl date to ISO:', crawlDate);
+                    }
                 }
 
-                // 5. Clean the final price
+                // Fallback: use extracted departure_date if crawl date conversion failed
+                if (!iso_flight_date && departure_date) {
+                    try {
+                        const dateParts = departure_date.split('/');
+                        if (dateParts.length === 3) {
+                            const day = parseInt(dateParts[0]);
+                            const month = parseInt(dateParts[1]) - 1;
+                            const year = parseInt(dateParts[2]);
+                            // Use UTC to avoid timezone issues
+                            const dateObj = new Date(Date.UTC(year, month, day));
+                            iso_flight_date = dateObj.toISOString();
+                        }
+                    } catch (error) {
+                        console.warn('Failed to convert departure_date to ISO:', departure_date);
+                    }
+                }
+
+                // Clean price: remove commas and VND
                 let cleaned_price = null;
                 if (total_price) {
                     cleaned_price = total_price
-                        .replace(/,/g, '')
-                        .replace(/\s*VND\s*/i, '')
-                        .replace(/\s*₫\s*/, '')
+                        .replace(/,/g, '') // Remove commas
+                        .replace(/\s*VND\s*/g, '') // Remove VND and surrounding spaces
+                        .replace(/\s*₫\s*/g, '') // Remove Vietnamese dong symbol if present
                         .trim();
                 }
 
@@ -487,22 +451,30 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                     departure_airport: departure_airport.code,
                     arrival_airport: arrival_airport.code,
                     flight_date: iso_flight_date,
-                    crawl_date: crawlDate,
+                    departure_date, // Keep original for debugging
+                    crawl_date: crawlDate, // Add for debugging
                     departure_time,
                     arrival_time,
                     total_price: cleaned_price,
                     classes,
-                    aircraft_type
+                    aircraft_type,
+                    // ticket_price,
+                    // tax_fee,
+                    // service_fee,
+                    // clicked_price: clickedPrice // Price from the clicked element
                 };
-            }, departure_airport, arrival_airport, mergedAircraftTypeMap, currentDateToCrawl, ticketClass);
+            }, departure_airport, arrival_airport, priceInfo.clickedPrice, mergedAircraftTypeMap, currentDateToCrawl);
             
-            if (flightData && !flightData.error && flightData.total_price) {
+            if (flightData && flightData.total_price) {
+                // Add debug logging for date verification
+                if (flightData.departure_date && flightData.crawl_date !== flightData.departure_date) {
+                    console.log(`⚠️ Date mismatch - Crawl: ${flightData.crawl_date}, Extracted: ${flightData.departure_date}`);
+                }
                 // console.log("✅ EXTRACTED COMPREHENSIVE DATA:", JSON.stringify(flightData, null, 2));
                 results.prices.push(flightData);
             } else {
-                const errorMessage = flightData ? flightData.error : 'Unknown extraction error';
-                console.warn(`⚠️ FAILED to extract booking details for price option ${i}: ${errorMessage}`);
-                results.errors.push(`Failed to extract booking details for price option ${i}: ${errorMessage}`);
+                console.warn(`⚠️ FAILED to extract booking details for price option ${i}`);
+                results.errors.push(`Failed to extract booking details for price option ${i}`);
             }
         }
 

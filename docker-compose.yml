@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # VietJet Crawl Service - Main flight data scraping service
+  vietjet-crawl-service:
+    build: 
+      context: ./vietjet-crawl-service
+      dockerfile: Dockerfile
+    container_name: vietjet-crawl-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      # Puppeteer configuration for Docker
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    volumes:
+      # Shared memory for Puppeteer (prevents browser crashes)
+      - /dev/shm:/dev/shm
+      # Persist crawl results and screenshots
+      - vietjet_results:/app/result
+      - vietjet_screenshots:/app/screenshot
+      # Persist configuration
+      - ./vietjet-crawl-service/flight-config.json:/app/flight-config.json
+      - ./vietjet-crawl-service/airports.csv:/app/airports.csv
+    networks:
+      - flight_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vietjet-crawl.rule=Host(`localhost`) && PathPrefix(`/api/v1/crawl/vietjet`)"
+      - "traefik.http.services.vietjet-crawl.loadbalancer.server.port=3001"
+
+  # API Gateway Service (placeholder for future implementation)
+  # Uncomment when api-gateway-service is ready
+  # api-gateway-service:
+  #   build: 
+  #     context: ./api-gateway-service
+  #     dockerfile: Dockerfile
+  #   container_name: api-gateway-service
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - PORT=3000
+  #     - VIETJET_SERVICE_URL=http://vietjet-crawl-service:3001
+  #   networks:
+  #     - flight_network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.http.routers.api-gateway.rule=Host(`localhost`)"
+  #     - "traefik.http.services.api-gateway.loadbalancer.server.port=3000"
+
+# Networks
+networks:
+  flight_network:
+    driver: bridge
+    name: flight_network
+
+# Volumes for persistent data
+volumes:
+  vietjet_results:
+    driver: local
+    name: vietjet_crawl_results
+  vietjet_screenshots:
+    driver: local
+    name: vietjet_crawl_screenshots

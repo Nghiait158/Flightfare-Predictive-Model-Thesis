@@ -1,0 +1,24 @@
+{
+    "name": "flightfare-predictive-scraping-model",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Thesis Project - VietJet Crawl Microservice",
+    "dependencies": {
+        "crawlee": "^3.0.0",
+        "csv-writer": "^1.6.0",
+        "dotenv": "^17.0.1",
+        "express": "^4.18.2",
+        "puppeteer": "^24.11.2"
+    },
+    "scripts": {
+        "start": "node app.js",
+        "dev": "node app.js",
+        "crawler": "node src/main.js",
+        "test": "node test-api.js",
+        "test:quick": "node test-api.js --skip-crawl"
+    },
+    "author": "Trinh Van Trung Nghia-ITITIU21254",
+    "license": "ISC",
+    "main": "app.js",
+    "keywords": ["crawling", "vietjet", "flight-price", "api", "microservice"]
+}

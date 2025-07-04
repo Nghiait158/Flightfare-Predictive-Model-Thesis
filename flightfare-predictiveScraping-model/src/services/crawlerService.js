@@ -21,8 +21,8 @@ import {
 } from '../services/flightService_VietJet.js';
 
 // const vietjet_URL = 'https://www.vietjetair.com/vi/pages/bao-hiem-du-lich-sky-care-1681121104781';
-const vietjet_URL = 'https://www.vietjetair.com/vi';
-const vietnamairlines_URL = 'https://www.vietnamairlines.com/vn/en';
+// const vietjet_URL = 'https://www.vietjetair.com/vi';
+const vietjet_URL = 'https://www.vietnamairlines.com/vn/en';
 
 // call from main.js
 export async function runCrawler(page, { flightConfig, airports }) {

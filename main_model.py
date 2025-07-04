@@ -518,15 +518,15 @@ def test_saved_model():
     predictor.load_model('flight_price_model.pkl')
     
     test_flight = {
-        'flight_number': 'VJ1126',
+        'flight_number': 'VJ1170',
         'departure_airport': 'SGN',
         'arrival_airport': 'HAN',
-        'departure_time': '08:10',
-        'arrival_time': '10:20',
+        'departure_time': '23:35',
+        'arrival_time': '01:45',
         'classes': 'Eco',
-        'type_of_plane': 'Airbus A320',
-        'create_at': '2025-06-23 22:13:00',
-        'flight_date': '2025-08-15T17:00:00.000'
+        'type_of_plane': 'Airbus A321',
+        'create_at': '2025-07-04 11:49:00', #yyyy,mm,dd 
+        'flight_date': '2025-07-05T17:00:00.000'
     }
     
     try:

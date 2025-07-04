@@ -1,4 +1,3 @@
-
 import puppeteer from 'puppeteer';
 import { 
     BROWSER_CONFIG, 
@@ -12,23 +11,34 @@ import { getTimestampedScreenshotPath } from '../constants/paths.js';
 
 export async function launchBrowser() {
     try {
-        
-        const browser = await puppeteer.launch({
-            headless: BROWSER_CONFIG.HEADLESS, //false
-            args: BROWSER_CONFIG.ARGS,
-            defaultViewport: BROWSER_CONFIG.DEFAULT_VIEWPORT, //null 
+        const dockerArgs = [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--headless',
+            '--window-size=1920,1080',
+            '--ignore-certificate-errors'
+        ];
 
-        });
+        const launchOptions = {
+            headless: BROWSER_CONFIG.HEADLESS,
+            args: [...BROWSER_CONFIG.ARGS, ...dockerArgs],
+            defaultViewport: BROWSER_CONFIG.DEFAULT_VIEWPORT,
+            protocolTimeout: 90000,
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
+        };
+
+        const browser = await puppeteer.launch(launchOptions);
         
         const page = await browser.newPage();
 
         await page.setUserAgent(BROWSER_CONFIG.USER_AGENT); 
         await page.setViewport({ 
-            width: BROWSER_CONFIG.VIEWPORT_WIDTH, //1920x1080
+            width: BROWSER_CONFIG.VIEWPORT_WIDTH,
             height: BROWSER_CONFIG.VIEWPORT_HEIGHT 
         });
 
-        
         return { browser, page };
         
     } catch (error) {

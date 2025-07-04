@@ -180,7 +180,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
     
     const startDate = new Date(startYear, startMonth, startDay);
 
-    const total_days_crawled= 15;
+    const total_days_crawled= 3;
 
     const endDay = new Date(startDate); 
     endDay.setDate(startDate.getDate() + total_days_crawled);
@@ -334,13 +334,11 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
             // Wait for the booking details panel to update after the click
             await new Promise(resolve => setTimeout(resolve, DELAY_SHORT)); 
 
-            // Extract comprehensive flight data including the clicked price
-            const flightData = await page.evaluate((departure_airport, arrival_airport, clickedPrice, aircraftTypeMap, crawlDate) => {
-                // The booking info is consistently in the 4th column of the main grid
+            // Extract comprehensive flight data
+            const flightData = await page.evaluate((departure_airport, arrival_airport, aircraftTypeMap, expectedFlightDate) => {
                 const bookingInfoContainer = document.querySelector('div.MuiGrid-grid-md-4');
                 if (!bookingInfoContainer) return null;
 
-                // Extract total price (Tổng tiền)
                 let total_price = null;
                 const h4Elements = bookingInfoContainer.querySelectorAll('h4');
                 for (const h4 of h4Elements) {
@@ -353,124 +351,55 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                     }
                 }
                 
-                // Fallback: If "Tổng tiền" is 0 or not found, try getting the price from the "Chuyến đi" section
-                if (!total_price || total_price === '0 ') {
-                    const tripPriceEl = Array.from(bookingInfoContainer.querySelectorAll('h4')).find(el => 
-                        el.textContent.includes('') && 
-                        el.previousElementSibling && 
-                        el.previousElementSibling.textContent.includes('Chuyến đi')
-                    );
-                    if (tripPriceEl) total_price = tripPriceEl.textContent.trim();
-                }
-                
-                // If no valid total price is found, abort
                 if (!total_price || total_price === '0 ') return null;
 
-                // Extract detailed flight information
-                let flight_number = null;
-                let departure_time = null;
-                let arrival_time = null;
-                let classes = null;
-                let departure_date = null;
-                let aircraft_type = null;
-
+                let flight_number = null, departure_time = null, arrival_time = null, classes = null, aircraft_type = null;
                 const detailsText = bookingInfoContainer.textContent;
-                
-                // Extract flight number (VJxxxx)
                 const flightMatch = detailsText.match(/(VJ\d+)/);
-                if (flightMatch) flight_number = flightMatch[1];
-
-                // Look up aircraft type from the map
-                if (flight_number && aircraftTypeMap[flight_number]) {
-                    aircraft_type = aircraftTypeMap[flight_number];
+                if (flightMatch) {
+                    flight_number = flightMatch[1];
+                    if (aircraftTypeMap[flight_number]) {
+                        aircraft_type = aircraftTypeMap[flight_number];
+                    }
                 }
 
-                // Extract departure and arrival times (HH:MM - HH:MM)
                 const timeMatch = detailsText.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
-                if (timeMatch) {
-                    departure_time = timeMatch[1];
-                    arrival_time = timeMatch[2];
-                }
+                if (timeMatch) [ , departure_time, arrival_time] = timeMatch;
 
-                // Extract flight class (Eco, Business, Deluxe, Skyboss)
                 const classMatch = detailsText.match(/(Skyboss|Business|Deluxe|Eco)/i);
                 if (classMatch) classes = classMatch[1];
-
-                // Extract departure date from webpage (for verification only)
-                const dateMatch = detailsText.match(/T\d+,\s*(\d{2}\/\d{2}\/\d{4})/);
-                if (dateMatch) departure_date = dateMatch[1];
-
-                // Use crawl date as primary source for flight_date (more reliable)
-                // Convert crawl date (DD/MM/YYYY) to ISO string
+                
+                // --- FIX: Always generate flight_date from the expected date ---
                 let iso_flight_date = null;
-                if (crawlDate) {
-                    try {
-                        const dateParts = crawlDate.split('/');
-                        if (dateParts.length === 3) {
-                            const day = parseInt(dateParts[0]);
-                            const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed in Date
-                            const year = parseInt(dateParts[2]);
-                            // Use UTC to avoid timezone issues
-                            const dateObj = new Date(Date.UTC(year, month, day));
-                            iso_flight_date = dateObj.toISOString();
-                        }
-                    } catch (error) {
-                        console.warn('Failed to convert crawl date to ISO:', crawlDate);
+                try {
+                    const dateParts = expectedFlightDate.split('/');
+                    if (dateParts.length === 3) {
+                        const day = parseInt(dateParts[0]);
+                        const month = parseInt(dateParts[1]) - 1;
+                        const year = parseInt(dateParts[2]);
+                        const dateObj = new Date(Date.UTC(year, month, day));
+                        iso_flight_date = dateObj.toISOString();
                     }
+                } catch (error) {
+                    // This should not happen if expectedFlightDate is always correct
                 }
 
-                // Fallback: use extracted departure_date if crawl date conversion failed
-                if (!iso_flight_date && departure_date) {
-                    try {
-                        const dateParts = departure_date.split('/');
-                        if (dateParts.length === 3) {
-                            const day = parseInt(dateParts[0]);
-                            const month = parseInt(dateParts[1]) - 1;
-                            const year = parseInt(dateParts[2]);
-                            // Use UTC to avoid timezone issues
-                            const dateObj = new Date(Date.UTC(year, month, day));
-                            iso_flight_date = dateObj.toISOString();
-                        }
-                    } catch (error) {
-                        console.warn('Failed to convert departure_date to ISO:', departure_date);
-                    }
-                }
-
-                // Clean price: remove commas and VND
-                let cleaned_price = null;
-                if (total_price) {
-                    cleaned_price = total_price
-                        .replace(/,/g, '') // Remove commas
-                        .replace(/\s*VND\s*/g, '') // Remove VND and surrounding spaces
-                        .replace(/\s*₫\s*/g, '') // Remove Vietnamese dong symbol if present
-                        .trim();
-                }
+                let cleaned_price = total_price.replace(/,/g, '').replace(/\s*VND\s*/g, '').replace(/\s*₫\s*/g, '').trim();
 
                 return {
                     flight_number,
                     departure_airport: departure_airport.code,
                     arrival_airport: arrival_airport.code,
-                    flight_date: iso_flight_date,
-                    departure_date, // Keep original for debugging
-                    crawl_date: crawlDate, // Add for debugging
+                    flight_date: iso_flight_date, // Correctly derived date
                     departure_time,
                     arrival_time,
                     total_price: cleaned_price,
                     classes,
                     aircraft_type,
-                    // ticket_price,
-                    // tax_fee,
-                    // service_fee,
-                    // clicked_price: clickedPrice // Price from the clicked element
                 };
-            }, departure_airport, arrival_airport, priceInfo.clickedPrice, mergedAircraftTypeMap, currentDateToCrawl);
+            }, departure_airport, arrival_airport, mergedAircraftTypeMap, currentDateToCrawl); // Pass currentDateToCrawl here
             
             if (flightData && flightData.total_price) {
-                // Add debug logging for date verification
-                if (flightData.departure_date && flightData.crawl_date !== flightData.departure_date) {
-                    console.log(`⚠️ Date mismatch - Crawl: ${flightData.crawl_date}, Extracted: ${flightData.departure_date}`);
-                }
-                // console.log("✅ EXTRACTED COMPREHENSIVE DATA:", JSON.stringify(flightData, null, 2));
                 results.prices.push(flightData);
             } else {
                 console.warn(`⚠️ FAILED to extract booking details for price option ${i}`);

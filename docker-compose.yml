@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # VietJet Crawl Service - Main flight data scraping service
   vietjet-crawl-service:
@@ -16,14 +14,17 @@ services:
       - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
       - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
     volumes:
-      # Shared memory for Puppeteer (prevents browser crashes)
-      - /dev/shm:/dev/shm
-      # Persist crawl results and screenshots
-      - vietjet_results:/app/result
-      - vietjet_screenshots:/app/screenshot
-      # Persist configuration
+      # --- Bind Mounts: For easy local access & editing ---
+      - ./vietjet-crawl-service/result:/app/result
+      - ./vietjet-crawl-service/screenshot:/app/screenshot
       - ./vietjet-crawl-service/flight-config.json:/app/flight-config.json
       - ./vietjet-crawl-service/airports.csv:/app/airports.csv
+
+      # --- Named Volume: For persistent application state ---
+      - crawler_storage:/app/storage
+
+      # Shared memory for Puppeteer (prevents browser crashes)
+      - /dev/shm:/dev/shm
     networks:
       - flight_network
     restart: unless-stopped
@@ -71,11 +72,17 @@ networks:
     driver: bridge
     name: flight_network
 
-# Volumes for persistent data
+# Define the named volume used by the service
 volumes:
-  vietjet_results:
+  crawler_storage:
     driver: local
-    name: vietjet_crawl_results
-  vietjet_screenshots:
-    driver: local
-    name: vietjet_crawl_screenshots
+    name: vietjet_crawler_storage
+
+# Named volumes are no longer needed as we are using bind mounts
+# volumes:
+#   vietjet_results:
+#     driver: local
+#     name: vietjet_crawl_results
+#   vietjet_screenshots:
+#     driver: local
+#     name: vietjet_crawl_screenshots

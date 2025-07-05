@@ -180,7 +180,7 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
     
     const startDate = new Date(startYear, startMonth, startDay);
 
-    const total_days_crawled= 3;
+    const total_days_crawled= 15;
 
     const endDay = new Date(startDate); 
     endDay.setDate(startDate.getDate() + total_days_crawled);

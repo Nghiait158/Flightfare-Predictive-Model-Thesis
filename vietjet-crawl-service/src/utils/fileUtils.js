@@ -62,7 +62,7 @@ export function readJSONFile(filePath) {
     }
 }
 
-// --------WRITE_JSON
+// --------WRITE_JSON------------------------
 export function writeJSONFile(data, filePath, pretty = true) {
     try {
         console.log(`Writing JSON file: ${path.basename(filePath)}`);

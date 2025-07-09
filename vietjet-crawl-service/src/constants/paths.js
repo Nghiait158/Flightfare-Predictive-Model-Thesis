@@ -1,15 +1,21 @@
-
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-export const BASE_DIR = process.cwd();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-export const AIRPORTS_CSV_PATH = path.join(BASE_DIR, 'airports.csv');
-export const FLIGHT_CONFIG_PATH = path.join(BASE_DIR, 'flight-config.json');
+const SERVICE_ROOT = path.join(__dirname, '..', '..');
+const PROJECT_ROOT = path.join(SERVICE_ROOT, '..');
 
-export const CRAWLER_DATA_SCRIPT = path.join(BASE_DIR, 'src', 'crawler_data.js');
+export const BASE_DIR = SERVICE_ROOT;
 
-export const SCREENSHOT_DIR = path.join(BASE_DIR, 'screenshot');
-export const RESULT_DIR = path.join(BASE_DIR, 'result');
+export const AIRPORTS_CSV_PATH = path.join(PROJECT_ROOT, 'airports.csv');
+export const FLIGHT_CONFIG_PATH = path.join(PROJECT_ROOT, 'flight-config.json');
+
+// export const CRAWLER_DATA_SCRIPT = path.join(BASE_DIR, 'src', 'crawler_data.js');
+
+export const SCREENSHOT_DIR = path.join(PROJECT_ROOT, 'screenshot');
+export const RESULT_DIR = path.join(PROJECT_ROOT, 'result');
 
 export const FLIGHT_RESULTS_PATH = path.join(SCREENSHOT_DIR, 'flight_results.json');
 export const ERROR_SCREENSHOT_PATH = path.join(SCREENSHOT_DIR, 'error.png');

@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { delay, DELAY_SHORT, DELAY_MEDIUM } from '../constants/constants.js';
 import { SELECTORS } from '../constants/selectors.js';
-import { SCREENSHOT_DIR } from '../constants/paths.js';
+import {FLIGHT_CONFIG_PATH, SCREENSHOT_DIR } from '../constants/paths.js';
 import { 
     safeClick, 
     typeText, 
@@ -20,7 +20,7 @@ import { log } from 'console';
 // import { crawlData_from_VietJetPage } from './crawlData_VietJet.js';
 import { crawlData_byDate_from_VietJetPage } from './crawlData_byDate_from_VietJetPage.js';
 import { appendToJsonFile, appendToCsvFile } from '../utils/fileUtils.js';
-import { RESULT_DIR, FLIGHT_CONFIG_PATH } from '../constants/paths.js';
+import { RESULT_DIR } from '../constants/paths.js';
 
 /**
  * Reads flight configuration from config file

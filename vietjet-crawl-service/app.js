@@ -1,3 +1,6 @@
+//  endpoint to crawl/scraping flight data from VietJet Airlines
+//  main logic for crawling flight fare 
+
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
@@ -45,9 +48,7 @@ app.use((req, res, next) => {
 const MAX_RETRIES = 3;
 const BASE_URL = 'https://www.vietjetair.com/vi';
 
-/**
- * Health check endpoint
- */
+// Health check endpoint
 app.get('/health', (req, res) => {
     res.json({
         status: 'OK',
@@ -56,17 +57,15 @@ app.get('/health', (req, res) => {
     });
 });
 
-/**
- * Main crawling endpoint
- */
-app.post('/api/v1/crawl/vietjet', async (req, res) => {
+// Main crawling endpoint
+app.post('/api/v1/crawl-by-date/vietjet', async (req, res) => {
     const startTime = Date.now();
     let browser = null;
     let page = null;
     let config = null;
 
     try {
-        console.log('🚀 API Crawl Request Started');
+        console.log('🚀 API Crawl VietJet Request Started');
         console.log('============================');
         console.log(`Started at: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`);
         console.log(`Request body:`, JSON.stringify(req.body, null, 2));
@@ -154,7 +153,7 @@ app.post('/api/v1/crawl/vietjet', async (req, res) => {
 
         // Launch browser
         console.log('🌐 Launching browser...');
-        const browserResult = await launchBrowser(BASE_URL);
+        const browserResult = await launchBrowser();
         browser = browserResult.browser;
         page = browserResult.page;
         

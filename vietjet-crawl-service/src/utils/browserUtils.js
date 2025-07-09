@@ -11,23 +11,30 @@ import { getTimestampedScreenshotPath } from '../constants/paths.js';
 
 export async function launchBrowser() {
     try {
-        const dockerArgs = [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--headless',
-            '--window-size=1920,1080',
-            '--ignore-certificate-errors'
-        ];
+        const isDocker = process.env.DOCKER_ENV === 'true';
+        let launchArgs = [...BROWSER_CONFIG.ARGS];
+
+        if (isDocker) {
+            console.log('🐋 Running in Docker environment, applying Docker-specific args.');
+            const dockerArgs = [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--headless'
+            ];
+            launchArgs.push(...dockerArgs);
+        }
 
         const launchOptions = {
-            headless: BROWSER_CONFIG.HEADLESS,
-            args: [...BROWSER_CONFIG.ARGS, ...dockerArgs],
+            headless: isDocker ? 'new' : BROWSER_CONFIG.HEADLESS,
+            args: launchArgs,
             defaultViewport: BROWSER_CONFIG.DEFAULT_VIEWPORT,
             protocolTimeout: 90000,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined
         };
+
+        console.log('🚀 Launching Puppeteer with options:', JSON.stringify({ headless: launchOptions.headless, args: launchOptions.args }, null, 2));
 
         const browser = await puppeteer.launch(launchOptions);
         

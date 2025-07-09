@@ -1,9 +1,8 @@
-
 import path from 'path';
 
 export const BASE_DIR = process.cwd();
 
-export const AIRPORTS_CSV_PATH = path.join(BASE_DIR, 'airports.csv');
+export const AIRPORTS_CSV_PATH = path.join(BASE_DIR, '..', 'airports.csv');
 export const FLIGHT_CONFIG_PATH = path.join(BASE_DIR, 'flight-config.json');
 
 export const CRAWLER_DATA_SCRIPT = path.join(BASE_DIR, 'src', 'crawler_data.js');

@@ -33,6 +33,13 @@ export const SELECTORS = {
         CALENDAR_HEADER: '.rdrMonthAndYearWrapper, .MuiPickersCalendarHeader-monthTitleContainer, .calendar-header, .datepicker-header'
     },
     
+    // Passenger selection
+    PASSENGERS: {
+        ADULT_INCREMENT: '.adult-passenger button.MuiFab-root:has(svg[viewBox="0 0 24 24"]), [data-testid*="adult"] button.MuiFab-root',
+        CHILD_INCREMENT: '.child-passenger button.MuiFab-root:has(svg[viewBox="0 0 24 24"]), [data-testid*="child"] button.MuiFab-root',
+        INFANT_INCREMENT: '.infant-passenger button.MuiFab-root:has(svg[viewBox="0 0 24 24"]), [data-testid*="infant"] button.MuiFab-root',
+    },
+    
     // Search form
     SEARCH: {
         ONEWAY_RADIO: 'input[type="radio"][value="oneway"], input[value="oneWay"], label[for="oneWay"], .trip-type-oneway',

@@ -121,7 +121,11 @@ export async function runCrawler(page, { flightConfig, airports }) {
             page, 
             departureAirport, 
             arrivalAirport, 
-            flightConfig.search_options
+            flightConfig.search_options,
+            flightConfig.adult,
+            flightConfig.child,
+            flightConfig.infant,
+
         );
 
         if (!searchResult.success) {

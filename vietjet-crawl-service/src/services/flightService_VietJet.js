@@ -382,13 +382,7 @@ async function selectAirportFromDropdown(page, airport, type) {
     }
 }
 
-/**
- * Selects flight date - supports specific dates and today
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} [dateString] - Date string in format DD/MM/YYYY or "today"
- * @param {string} [returnDateString] - Return date string for round trip
- * @returns {Promise<boolean>} True if date selection succeeded
- */
+
 export async function selectFlightDate(page, dateString = null, returnDateString = null) {
     try {
         
@@ -464,13 +458,7 @@ export async function selectFlightDate(page, dateString = null, returnDateString
     }
 }
 
-/**
- * Selects specific date from date picker
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} dateString - Date string in format DD/MM/YYYY
- * @param {string} type - 'departure' or 'return'
- * @returns {Promise<boolean>} True if date selection succeeded
- */
+
 async function selectSpecificDate(page, dateString, type = 'departure') {
     try {
         console.log(`📅 Selecting specific ${type} date: ${dateString}`);
@@ -650,12 +638,7 @@ async function selectSpecificDate(page, dateString, type = 'departure') {
     }
 }
 
-/**
- * Navigates calendar to target month/year
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {Date} targetDate - Target date to navigate to
- * @returns {Promise<boolean>} True if navigation succeeded
- */
+
 async function navigateToMonth(page, targetDate) {
     try {
         const targetMonth = targetDate.getMonth(); // 0-indexed
@@ -663,7 +646,7 @@ async function navigateToMonth(page, targetDate) {
         
         console.log(`📅 Navigating to ${targetYear}/${targetMonth + 1}`);
         
-        // Get current displayed month/year using Puppeteer
+        // Get current displayed month/year using
         let attempts = 0;
         const maxAttempts = 12; // Max 12 months navigation
         
@@ -781,13 +764,88 @@ async function navigateToMonth(page, targetDate) {
         return false;
     }
 }
+async function selectPassengers(page, adult, child, infant) {
+    try {
+        console.log("Selecting passengers: Adult: "+adult+" Child: "+child+ " Infant: "+infant);
+        
+        // Find all increment buttons by their structure
+        const incrementButtons = await page.$$('button.MuiFab-root.MuiFab-sizeSmall');
+        const validButtons = [];
+        
+        // Filter buttons that have the plus icon
+        for (const button of incrementButtons) {
+            try {
+                const svgPath = await button.$eval('svg path', el => el.getAttribute('d'));
+                if (svgPath === 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z') {
+                    validButtons.push(button);
+                }
+            } catch (error) {
+                // Skip this button if it doesn't have the expected structure
+                continue;
+            }
+        }
+        
+        console.log(`Found ${validButtons.length} increment buttons`);
+        
+        if (validButtons.length === 0) {
+            console.warn('⚠️ No increment buttons found');
+            return false;
+        }
+        
+        // Handle Adult passengers (button 0 = adult, subtract 1 because default is usually 1 adult)
+        if (adult > 1 && validButtons[0]) {
+            console.log(`Adding ${adult - 1} more adult passengers...`);
+            for (let i = 0; i < adult - 1; i++) {
+                try {
+                    await validButtons[0].click();
+                    console.log(`✅ Adult passenger ${i + 2} added`);
+                    await delay(DELAY_SHORT);
+                } catch (error) {
+                    console.warn(`⚠️ Could not add adult passenger ${i + 2}:`, error.message);
+                    break;
+                }
+            }
+        }
 
-/**
- * Selects trip type (one-way or round-trip)
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} [tripType='oneway'] - Trip type: 'oneway' or 'roundtrip'
- * @returns {Promise<boolean>} True if trip type selection succeeded
- */
+        // Handle Child passengers (button 1 = child)
+        if (child > 0 && validButtons[1]) {
+            console.log(`Adding ${child} child passengers...`);
+            for (let i = 0; i < child; i++) {
+                try {
+                    await validButtons[1].click();
+                    console.log(`✅ Child passenger ${i + 1} added`);
+                    await delay(DELAY_SHORT);
+                } catch (error) {
+                    console.warn(`⚠️ Could not add child passenger ${i + 1}:`, error.message);
+                    break;
+                }
+            }
+        }
+
+        // Handle Infant passengers (button 2 = infant)
+        if (infant > 0 && validButtons[2]) {
+            console.log(`Adding ${infant} infant passengers...`);
+            for (let i = 0; i < infant; i++) {
+                try {
+                    await validButtons[2].click();
+                    console.log(`✅ Infant passenger ${i + 1} added`);
+                    await delay(DELAY_SHORT);
+                } catch (error) {
+                    console.warn(`⚠️ Could not add infant passenger ${i + 1}:`, error.message);
+                    break;
+                }
+            }
+        }
+
+        console.log("✅ Passenger selection completed");
+        return true;
+        
+    } catch (error) {
+        console.error('❌ Failed to select passenger:', error.message);
+        return false;
+    }
+}
+
 export async function selectTripType(page, tripType = 'oneway') {
     try {
         console.log(`Selecting trip type: ${tripType}`);
@@ -833,12 +891,8 @@ export async function selectTripType(page, tripType = 'oneway') {
     }
 }
 
-/**
- * Submits the flight search form
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} [tripType='oneway'] - Trip type for validation (optional)
- * @returns {Promise<boolean>} True if form submission succeeded
- */
+// Submits the flight search form
+
 export async function submitSearchForm(page, tripType = 'oneway') {
     try {
         // Read flight configuration
@@ -962,12 +1016,8 @@ export async function submitSearchForm(page, tripType = 'oneway') {
     }
 }
 
-/**
- * Gets flight results using crawler script injection or fallback methods
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {string} dateString - The date of the flight search
- * @returns {Promise<Object|null>} Flight results object or null if failed
- */
+// Gets flight results using crawler script injection or fallback methods
+
 export async function getFlightResults(page, dateString, departure_airport, arrival_airport) {
     try {
         console.log('Starting Crawling flight ticket');
@@ -1147,11 +1197,7 @@ async function handleStickClose(page) {
     }
 }
 
-/**
- * Manually extracts flight results from the page
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @returns {Promise<Object|null>} Manually extracted results
- */
+
 async function extractResultsManually(page) {
     try {
         console.log('🔍 Manually extracting flight results...');
@@ -1231,11 +1277,7 @@ async function extractResultsManually(page) {
     }
 }
 
-/**
- * Gets basic page information as final fallback
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @returns {Promise<Object>} Basic page information
- */
+
 async function getBasicPageInfo(page) {
     try {
         const pageInfo = await page.evaluate(() => {
@@ -1262,11 +1304,7 @@ async function getBasicPageInfo(page) {
     }
 }
 
-/**
- * Handles cookie consent popups on the page.
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @returns {Promise<void>}
- */
+
 async function handleCookieConsent(page) {
     try {
        await delay(DELAY_MEDIUM); // Wait for popups to appear
@@ -1311,18 +1349,7 @@ async function handleCookieConsent(page) {
     }
 }
 
-/**
- * Performs complete flight search workflow
- * @param {import('puppeteer').Page} page - Puppeteer page instance
- * @param {Airport} departureAirport - Departure airport information
- * @param {Airport} arrivalAirport - Arrival airport information
- * @param {Object} searchOptions - Search configuration options
- * @param {string} [searchOptions.departure_date] - Departure date (DD/MM/YYYY or 'today')
- * @param {string} [searchOptions.return_date] - Return date for round trip (DD/MM/YYYY)
- * @param {string} [searchOptions.trip_type='oneway'] - Trip type: 'oneway' or 'roundtrip'
- * @returns {Promise<FlightSearchResult>} Complete search result
- */
-export async function performFlightSearch_VietJet(page, departureAirport, arrivalAirport, searchOptions = {}) {
+export async function performFlightSearch_VietJet(page, departureAirport, arrivalAirport, searchOptions = {}, adult, child, infant) {
     const {
         departure_date = 'today',
         return_date = null,
@@ -1337,12 +1364,28 @@ export async function performFlightSearch_VietJet(page, departureAirport, arriva
         returnDate: return_date,
         tripType: trip_type,
         results: null,
-        error: null
+        error: null,
+        adult: adult,
+        child: child,
+        infant: infant,
     };
+
     
+
     try {
+
+            // console.log("Check variable");
+            
+            // console.log("Adult: "+adult);
+            // console.log("Child: "+child);
+            // console.log("Infant: "+infant);
+
         console.log(`Starting flight search: ${departureAirport.city} → ${arrivalAirport.city}`);
         console.log(`Departure: ${departure_date}, Return: ${return_date || 'N/A'}, Type: ${trip_type}`);
+        console.log("Adult: "+adult);
+        console.log("Child: "+child);
+        console.log("Infant: "+infant);
+
         console.log('');
         
         // Handle cookie consent first
@@ -1374,7 +1417,13 @@ export async function performFlightSearch_VietJet(page, departureAirport, arriva
         if (!dateSelected) {
             throw new Error('Failed to select flight date(s)');
         }
-        
+
+        const passengersSelected= await selectPassengers(page, adult, child, infant);
+        if (!passengersSelected) {
+            throw new Error('Failed to select passengers(s)');
+        }
+       
+
         // Step 5: Submit search form
         const formSubmitted = await submitSearchForm(page, trip_type);
         if (!formSubmitted) {

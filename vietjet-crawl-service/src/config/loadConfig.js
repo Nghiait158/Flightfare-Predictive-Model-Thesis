@@ -2,7 +2,7 @@
  * @fileoverview Configuration loading and validation utilities
  */
 
-import { readCSVFile, readJSONFile } from '../utils/fileUtils.js';
+import { fileExists, readCSVFile, readJSONFile } from '../utils/fileUtils.js';
 import { AIRPORTS_CSV_PATH, FLIGHT_CONFIG_PATH } from '../constants/paths.js';
 
 /**
@@ -142,6 +142,8 @@ export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configP
         const flightConfig = readJSONFile(configPath);
         validateFlightConfigStructure(flightConfig);
         console.log(`Flight configuration loaded: ${flightConfig.departure_airport} → ${flightConfig.arrival_airport}`);
+        console.log(`                             Adult: ${flightConfig.adult}-  Child: ${flightConfig.child} - Infant: ${flightConfig.infant}`);
+
 
         const { departureAirport, arrivalAirport } = validateAirportAvailability(flightConfig, airports);
 
@@ -149,7 +151,10 @@ export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configP
         const defaultSearchOptions = {
             trip_type: 'oneway',
             find_cheapest: true,
-            departure_date: 'today'
+            departure_date: 'today',
+            adult: 1,
+            child: 0,
+            infant: 0
         };
 
         // If there is no previous config, the default is as above

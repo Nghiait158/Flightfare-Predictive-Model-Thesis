@@ -4,10 +4,10 @@
   "search_options": {
     "trip_type": "oneway",
     "find_cheapest": false,
-    "departure_date": "18/07/2025"
+    "departure_date": "28/07/2025"
   },
   "adult": 2,
-  "child": 1,
+  "child": 2,
   "infant": 1,
-  "updated_at": "2025-07-10T15:28:17.250Z"
+  "updated_at": "2025-07-11T18:04:07.428Z"
 }

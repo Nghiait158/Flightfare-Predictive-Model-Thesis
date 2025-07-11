@@ -220,6 +220,9 @@ export async function appendToCsvFile(filePath, records) {
                 { id: 'arrival_time', title: 'arrival_time' },
                 { id: 'classes', title: 'classes' },
                 { id: 'price', title: 'price' },
+                { id: 'adult', title: 'adult' },
+                { id: 'child', title: 'child' },
+                { id: 'infant', title: 'infant' },
             ],
             append: fileExists,
             writeHeaders: !fileExists

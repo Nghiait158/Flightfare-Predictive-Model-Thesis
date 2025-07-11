@@ -1,9 +1,0 @@
-{
-  "departure_airport": "SGN",
-  "arrival_airport": "HAN",
-  "search_options": {
-    "trip_type": "oneway",
-    "find_cheapest": false,
-    "departure_date": "04/09/2025"
-  }
-}

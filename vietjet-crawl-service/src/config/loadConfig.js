@@ -151,7 +151,11 @@ export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configP
         const defaultSearchOptions = {
             trip_type: 'oneway',
             find_cheapest: true,
-            departure_date: 'today',
+            departure_date: 'today'
+        };
+
+        // Default passenger counts
+        const defaultPassengers = {
             adult: 1,
             child: 0,
             infant: 0
@@ -160,6 +164,7 @@ export async function loadFlightConfig(airportsPath = AIRPORTS_CSV_PATH, configP
         // If there is no previous config, the default is as above
         // Nếu không có config trc thì mặc định như bên trên 
         const finalConfig = {
+            ...defaultPassengers,
             ...flightConfig,
             search_options: {
                 ...defaultSearchOptions,

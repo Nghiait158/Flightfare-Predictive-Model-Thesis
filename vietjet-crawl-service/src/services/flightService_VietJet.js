@@ -1018,7 +1018,7 @@ export async function submitSearchForm(page, tripType = 'oneway') {
 
 // Gets flight results using crawler script injection or fallback methods
 
-export async function getFlightResults(page, dateString, departure_airport, arrival_airport) {
+export async function getFlightResults(page, dateString, departure_airport, arrival_airport, adult, child, infant) {
     try {
         console.log('Starting Crawling flight ticket');
         
@@ -1078,6 +1078,9 @@ export async function getFlightResults(page, dateString, departure_airport, arri
                     classes: flight.classes,
                     aircraft_type: flight.aircraft_type,
                     price: flight.total_price,
+                    adult: adult,
+                    child: child,
+                    infant: infant,
                 };
             });
             await appendToCsvFile(csvFilePath, csvRecords);
@@ -1431,7 +1434,7 @@ export async function performFlightSearch_VietJet(page, departureAirport, arriva
         }
         
         // Step 5: Get flight results
-        const results = await getFlightResults(page, departure_date, departureAirport,arrivalAirport );
+        const results = await getFlightResults(page, departure_date, departureAirport, arrivalAirport, adult, child, infant);
         
         searchResult.success = true;
         searchResult.results = results;

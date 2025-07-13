@@ -1,16 +1,6 @@
-/**
- * @fileoverview Crawl flight data from VietJet page using Puppeteer clicks.
- * This version uses a robust strategy to find and click each price option,
- * then scrapes the booking details panel.
- */
 
 import { DELAY_SHORT } from '../constants/constants.js';
 
-/**
- * Finds all clickable price option containers on the page.
- * This function is designed to be executed in the browser context via page.evaluate.
- * @returns {Array<HTMLElement>} An array of clickable price container elements.
- */
 function findClickablePriceOptions() {
     const options = [];
     // Select all divs on the page. This is a broad starting point.
@@ -43,90 +33,6 @@ function findClickablePriceOptions() {
     return options;
 }
 
-
-/**
- * Extracts flight details from the booking information panel.
- * This function is designed to be executed in the browser context via page.evaluate.
- * @param {Object} departure_airport - The departure airport object.
- * @param {Object} arrival_airport - The arrival airport object.
- * @returns {Object|null} An object with the extracted flight data or null if extraction fails.
- */
-function extractBookingDetails(departure_airport, arrival_airport) {
-    // The booking info is consistently in the 4th column of the main grid.
-    const bookingInfoContainer = document.querySelector('div.MuiGrid-grid-md-4');
-    if (!bookingInfoContainer) return null;
-
-    let total_price = null;
-    
-    // Find total price by looking for the "Tổng tiền" label.
-    const h4Elements = bookingInfoContainer.querySelectorAll('h4');
-    for (const h4 of h4Elements) {
-        if (h4.textContent.trim().includes('Tổng tiền')) {
-            const priceEl = h4.nextElementSibling;
-            if (priceEl && priceEl.textContent.trim() !== '0 ') {
-                total_price = priceEl.textContent.trim();
-                break;
-            }
-        }
-    }
-    
-    // Fallback: If "Tổng tiền" is 0 or not found, try getting the price from the "Chuyến đi" section.
-    if (!total_price || total_price === '0 ') {
-        const tripPriceEl = Array.from(bookingInfoContainer.querySelectorAll('h4')).find(el => 
-            el.textContent.includes('') && 
-            el.previousElementSibling && 
-            el.previousElementSibling.textContent.includes('Chuyến đi')
-        );
-        if (tripPriceEl) total_price = tripPriceEl.textContent.trim();
-    }
-    
-    // If no valid price is found, abort.
-    if (!total_price || total_price === '0') return null;
-
-    let flight_number = null, departure_time = null, arrival_time = null, classes = null;
-
-    const detailsText = bookingInfoContainer.textContent;
-    // Use regex to find flight number (VJxxxx), times, and class.
-    const timeMatch = detailsText.match(/(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
-    if (timeMatch) {
-        [ , departure_time, arrival_time] = timeMatch;
-    }
-
-    const flightMatch = detailsText.match(/(VJ\d+)/);
-    if (flightMatch) flight_number = flightMatch[1];
-
-    const classMatch = detailsText.match(/(Skyboss|Business|Deluxe|Eco)/);
-    if (classMatch) classes = classMatch[1];
-    
-    // Clean price: remove commas and VND
-    let cleaned_price = null;
-    if (total_price) {
-        cleaned_price = total_price
-            .replace(/,/g, '') // Remove commas
-            .replace(/\s*VND\s*/g, '') // Remove VND and surrounding spaces
-            .replace(/\s*₫\s*/g, '') // Remove Vietnamese dong symbol if present
-            .trim();
-    }
-    
-    return {
-        flight_number,
-        departure_airport: departure_airport.code,
-        arrival_airport: arrival_airport.code,
-        departure_time,
-        arrival_time,
-        classes,
-        total_price: cleaned_price
-    };
-}
-
-/**
- * Crawls VietJet flight data by clicking on price elements using Puppeteer.
- * @param {import('puppeteer').Page} page - Puppeteer page instance.
- * @param {string} dateString - The date string for the flight search.
- * @param {Object} departure_airport - Departure airport object with code property.
- * @param {Object} arrival_airport - Arrival airport object with code property.
- * @returns {Promise<Object>} Flight data results.
- */
 export async function crawlData_byDate_from_VietJetPage(page, dateString, departure_airport, arrival_airport) {
     const allResults = [];
     

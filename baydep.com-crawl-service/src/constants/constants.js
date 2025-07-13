@@ -30,7 +30,7 @@ export const delay = (ms, randomize = true) => {
  * Browser configuration constants
  */
 export const BROWSER_CONFIG = {
-    HEADLESS: false,
+    HEADLESS: true,
     ARGS: [
         '--start-maximized',
         '--no-sandbox',

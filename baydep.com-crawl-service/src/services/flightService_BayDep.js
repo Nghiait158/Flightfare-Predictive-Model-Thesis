@@ -1080,14 +1080,15 @@ export async function getFlightResults(page, dateString, departure_airport, arri
 async function executeCrawlerScript(page, dateString, departure_airport, arrival_airport) {
     try {
         console.log('Appeard page need to scraping');
-
+        
+        await delay(10000);
         await scrollToBottom(page);
         
         // Wait a bit for content to load after scrolling
-        await delay(DELAY_MEDIUM);
+        await delay(10000);
 
         // Execute the imported crawler function in the page's context
-        const results = await crawlData_byDate_from_BayDepPage(page, dateString, departure_airport, arrival_airport);
+        await crawlData_byDate_from_BayDepPage(page, dateString, departure_airport, arrival_airport, { fastMode: true, batchSize: 50 });
         if (results && !results.error) {
             console.log('Crawler script executed:', Object.keys(results));
             return results;

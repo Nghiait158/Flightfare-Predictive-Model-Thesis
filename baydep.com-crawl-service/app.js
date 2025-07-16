@@ -48,8 +48,6 @@ app.use((req, res, next) => {
 // Constants
 const MAX_RETRIES = 3;
 const BASE_URL = '';
-
-
 // Health check endpoint
 app.get('/check-health', (req, res) => {
     res.json({
@@ -65,6 +63,8 @@ app.post('/api/v1/crawl/baydep.com', async (req, res) => {
     let browser = null;
     let page = null;
     let config = null;
+    let crawlerResult = null;
+    let stats = null;
 
     try {
         console.log('API Crawl baydep.com Request Started');
@@ -166,7 +166,7 @@ app.post('/api/v1/crawl/baydep.com', async (req, res) => {
         if (clear_screenshots) {
             try {
                 clearDirectory(SCREENSHOT_DIR);
-                console.log('📸 Screenshots directory cleared');
+                // console.log('📸 Screenshots directory cleared');
             } catch (error) {
                 console.warn(`⚠️ Failed to clear screenshots directory: ${error.message}`);
             }
@@ -175,13 +175,13 @@ app.post('/api/v1/crawl/baydep.com', async (req, res) => {
         // Load flight configuration and airports
         config = await loadFlightConfig();
         
-        console.log(`📋 Configuration loaded:`);
-        console.log(`   • Route: ${config.flightConfig.departure_airport} → ${config.flightConfig.arrival_airport}`);
-        console.log(`   • Departure: ${config.departureAirport.city} (${config.departureAirport.airport_name})`);
-        console.log(`   • Arrival: ${config.arrivalAirport.city} (${config.arrivalAirport.airport_name})`);
-        console.log(`   • Adult: ${config.flightConfig.adult} `);
-        console.log(`   • Child: ${config.flightConfig.child}`);
-        console.log(`   • Infant: ${config.flightConfig.infant}`);
+        // console.log(`📋 Configuration loaded:`);
+        // console.log(`   • Route: ${config.flightConfig.departure_airport} → ${config.flightConfig.arrival_airport}`);
+        // console.log(`   • Departure: ${config.departureAirport.city} (${config.departureAirport.airport_name})`);
+        // console.log(`   • Arrival: ${config.arrivalAirport.city} (${config.arrivalAirport.airport_name})`);
+        // console.log(`   • Adult: ${config.flightConfig.adult} `);
+        // console.log(`   • Child: ${config.flightConfig.child}`);
+        // console.log(`   • Infant: ${config.flightConfig.infant}`);
         
         // Validate crawler configuration
         validateCrawlerConfig({
@@ -203,9 +203,6 @@ app.post('/api/v1/crawl/baydep.com', async (req, res) => {
         setupBrowserLogging(page);
 
         // Run crawler
-        console.log('🔍 Starting crawler execution...');
-        let crawlerResult;
-
         if (use_retry) {
             crawlerResult = await runCrawlerWithRetry(
                 page, 
@@ -226,16 +223,7 @@ app.post('/api/v1/crawl/baydep.com', async (req, res) => {
         }
 
         // Generate statistics
-        const stats = getCrawlerStats(crawlerResult);
-        const totalDuration = Date.now() - startTime;
-
-        console.log('📊 Execution Statistics:');
-        console.log(`   • Success: ${stats.success ? '✅' : '❌'}`);
-        console.log(`   • Route: ${stats.route}`);
-        console.log(`   • Execution time: ${stats.executionTimeFormatted}`);
-        console.log(`   • Steps completed: ${stats.stepsCompleted}`);
-        console.log(`   • Screenshots taken: ${stats.screenshotsTaken}`);
-        console.log(`   • Results available: ${stats.hasResults ? '✅' : '❌'}`);
+        stats = getCrawlerStats(crawlerResult);
 
         // Prepare API response
         const apiResponse = {
@@ -265,8 +253,8 @@ app.post('/api/v1/crawl/baydep.com', async (req, res) => {
                 },
                 execution_stats: {
                     success: stats.success,
-                    execution_time_ms: totalDuration,
-                    execution_time_formatted: `${(totalDuration / 1000).toFixed(2)} seconds`,
+                    execution_time_ms: Date.now() - startTime,
+                    execution_time_formatted: `${((Date.now() - startTime) / 1000).toFixed(2)} seconds`,
                     steps_completed: stats.stepsCompleted,
                     screenshots_taken: stats.screenshotsTaken,
                     start_time: stats.startTime,
@@ -282,22 +270,12 @@ app.post('/api/v1/crawl/baydep.com', async (req, res) => {
             apiResponse.error = crawlerResult.error;
         }
 
-        // Log success message
-        if (crawlerResult.success) {
-            console.log('\n🎉 API Crawl Request Completed Successfully!');
-            console.log('===========================================');
-            console.log(`⏱️ Total execution time: ${(totalDuration / 1000).toFixed(2)} seconds`);
-            console.log(`📸 Screenshots taken: ${crawlerResult.screenshots.length}`);
-            console.log(`📊 Results: ${crawlerResult.results ? 'Available' : 'None'}`);
-        }
-
         // Return response
         const statusCode = crawlerResult.success ? 200 : 500;
         return res.status(statusCode).json(apiResponse);
 
     } catch (error) {
         console.error('\n❌ Critical error in API crawl request!');
-        console.error('=======================================');
         console.error(`🔥 Error: ${error.message}`);
         console.error(`📍 Stack trace: ${error.stack}`);
 
@@ -325,23 +303,26 @@ app.post('/api/v1/crawl/baydep.com', async (req, res) => {
 
     } finally {
         // Cleanup - Always ensure browser is closed
-        console.log('\n🧹 Cleanup and resource management...');
-        
         if (browser) {
             try {
                 await closeBrowser(browser);
-                console.log('✅ Browser closed successfully');
             } catch (closeError) {
                 console.error(`⚠️ Error closing browser: ${closeError.message}`);
             }
         }
 
-        // Final summary
-        const finalDuration = (Date.now() - startTime) / 1000;
-        console.log('\n📋 API Request Summary');
-        console.log('=====================');
-        console.log(`🕒 Total runtime: ${finalDuration.toFixed(2)} seconds`);
-        console.log(`⏰ Completed at: ${new Date().toISOString()}`);
+        const finalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
+        
+        if (crawlerResult && crawlerResult.success) {
+            console.log('\n🎉 API Crawl Request Completed Successfully!');
+            console.log('===========================================');
+            console.log(`🕒 Runtime: ${finalDuration} seconds`);
+            console.log(`⏰ Completed at: ${new Date().toISOString()}`);
+        } else {
+            const errorMsg = crawlerResult ? crawlerResult.error : "A critical error occurred before crawling could complete.";
+            console.error(`\n❌ Crawl FAILED. Error: ${errorMsg}`);
+            console.error(`🕒 Runtime: ${finalDuration} seconds`);
+        }
     }
 });
 
@@ -367,9 +348,8 @@ app.get('/api/v1/config/flight', async (req, res) => {
     }
 });
 
-/**
- * Error handling middleware
- */
+//  Error handling middleware
+
 app.use((error, req, res, next) => {
     console.error('Unhandled error:', error);
     res.status(500).json({
@@ -379,9 +359,8 @@ app.use((error, req, res, next) => {
     });
 });
 
-/**
- * 404 handler
- */
+// 404 handler
+
 app.use((req, res) => {
     res.status(404).json({
         success: false,
@@ -395,11 +374,10 @@ app.use((req, res) => {
     });
 });
 
-/**
- * Start server
- */
+// Start server
+ 
 app.listen(PORT, () => {
-    console.log('🚀 Baydep.com Crawl Service API Server Started');
+    console.log('🚀 Baydep.vn Crawl Service API Server Started');
     console.log('==========================================');
     console.log(`🌐 Server running on port: ${PORT}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health`);

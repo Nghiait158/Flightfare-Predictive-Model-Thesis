@@ -1,5 +1,4 @@
 // -- -----------Main crawler service----------
-
 import { delay, DELAY_MEDIUM, DELAY_LONG } from '../constants/constants.js';
 
 import { 
@@ -104,7 +103,10 @@ export async function runCrawler(page, { flightConfig, airports }) {
             page, 
             departureAirport, 
             arrivalAirport, 
-            flightConfig.search_options
+            flightConfig.search_options,
+            flightConfig.adult,
+            flightConfig.child,
+            flightConfig.infant,
         );
 
         if (!searchResult.success) {
@@ -116,14 +118,13 @@ export async function runCrawler(page, { flightConfig, airports }) {
         console.log('');
 
         // Step 7: Take final screenshot
-        console.log('📋 Step 7: Taking final results screenshot...');
+        // console.log('Taking final results screenshot...');
         const finalScreenshot = await takeScreenshot(page, 'crawler-final-results');
         screenshots.push(finalScreenshot);
         steps.push('Final screenshot captured');
-        console.log('✅ Final results screenshot captured\n');
-
-        // Step 8: Process and validate results
-        console.log('📋 Step 8: Processing and validating results...');
+// -----------------------------------------------------------------------------------
+        // Process and validate results
+        // console.log('Processing and validating results...');
         
         if (result.results) {
             console.log('📊 Results Summary:');
@@ -190,7 +191,6 @@ export async function runCrawler(page, { flightConfig, airports }) {
 }
 
 // -----------------------Runs crawler with retry logic --------------------
-
 export async function runCrawlerWithRetry(page, config, options = {}) {
     const { maxRetries = 2, retryDelay = 5000 } = options;
     
@@ -267,11 +267,7 @@ export function validateCrawlerConfig(config) {
     console.log('Crawler configuration validated');
 }
 
-/**
- * Gets crawler execution statistics
- * @param {CrawlerResult} result - Crawler result to analyze
- * @returns {Object} Execution statistics
- */
+// Gets crawler execution statistics
 export function getCrawlerStats(result) {
     return {
         executionTime: result.duration,

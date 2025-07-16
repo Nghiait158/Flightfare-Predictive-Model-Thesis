@@ -16,6 +16,7 @@ export const FLIGHT_CONFIG_PATH = path.join(PROJECT_ROOT, 'flight-config.json');
 
 export const SCREENSHOT_DIR = path.join(PROJECT_ROOT, 'screenshot');
 export const RESULT_DIR = path.join(PROJECT_ROOT, 'result');
+// export const RESULT_DIR = path.join(PROJECT_ROOT, 'result');
 
 export const FLIGHT_RESULTS_PATH = path.join(SCREENSHOT_DIR, 'flight_results.json');
 export const ERROR_SCREENSHOT_PATH = path.join(SCREENSHOT_DIR, 'error.png');

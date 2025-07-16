@@ -1,8 +1,8 @@
 {
-    "name": "vietnamairlines-crawl-service",
+    "name": "baydep.vn-crawl-service",
     "version": "1.0.0",
     "type": "module",
-    "description": "Crawl service for Vietnam Airlines",
+    "description": "Crawl service for baydep.vn",
     "dependencies": {
         "crawlee": "^3.0.0",
         "csv-writer": "^1.6.0",
@@ -22,7 +22,7 @@
     "main": "app.js",
     "keywords": [
         "crawling",
-        "vietnamairlines",
+        "baydep.vn",
         "flight-price",
         "api",
         "microservice"

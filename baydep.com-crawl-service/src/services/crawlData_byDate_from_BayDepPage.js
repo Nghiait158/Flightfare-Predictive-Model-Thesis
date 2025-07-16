@@ -4,9 +4,10 @@ import {
 import { delay, DELAY_SHORT, DELAY_MEDIUM } from '../constants/constants.js';
 import { appendToCsvFile } from '../utils/fileUtils.js';
 import path from 'path';
+import { RESULT_DIR } from '../constants/paths.js';
 
 // import { RESULT_DIR } from '../constants/paths.js';
-export async function crawlData_byDate_from_BayDepPage(page, dateString, departure_airport, arrival_airport, options = {}) {
+export async function crawlData_byDate_from_BayDepPage(page, dateString, departure_airport, arrival_airport, adult, child, infant, options = {}) {
     console.log("Crawl for date: "+dateString);
     console.log("Appear page to crawl");
 
@@ -38,6 +39,7 @@ export async function crawlData_byDate_from_BayDepPage(page, dateString, departu
     let consecutiveErrors = 0;
     const maxConsecutiveErrors = 3; // Reduced threshold
     let successfulCrawls = 0;
+    const allFlightsData = [];
 
     for (let i=0; i< itemsToProcess; i++){
         // console.log(`Clicking on detail link ${i + 1}/${itemsToProcess}`);
@@ -223,7 +225,7 @@ export async function crawlData_byDate_from_BayDepPage(page, dateString, departu
             }
 
             // Chuẩn bị dữ liệu để lưu vào CSV
-            const csvData = [{
+            const flightData = {
                 flight_number: flightDetails.flight_number,
                 aircraft_type: flightDetails.type_of_plane,
                 departure_airport: flightDetails.departure_airport,
@@ -232,17 +234,13 @@ export async function crawlData_byDate_from_BayDepPage(page, dateString, departu
                 departure_time: flightDetails.depart_time,
                 arrival_time: flightDetails.arrival_time,
                 classes: flightDetails.classes,
-                price: flightDetails.price
-            }];
+                price: flightDetails.price,
+                adult: adult,
+                child: child,
+                infant: infant
+            };
+            allFlightsData.push(flightData);
 
-            // Lưu vào CSV file với error handling
-            try {
-                const csvFilePath = path.join(process.cwd(), 'result', 'flight_price_history.csv');
-                await appendToCsvFile(csvFilePath, csvData);
-                // console.log(`✅ Saved flight ${i + 1} data to CSV`);
-            } catch (csvError) {
-                console.error(`Error saving CSV for flight ${i + 1}: ${csvError.message}`);
-            }
 
             // Delay tối ưu giữa các flight
             await delay(fastMode ? DELAY_MEDIUM : 300);
@@ -290,6 +288,17 @@ export async function crawlData_byDate_from_BayDepPage(page, dateString, departu
         
     }
 
+    if (allFlightsData.length > 0) {
+        try {
+            // const csvFilePath = path.join(process.cwd(), 'result', 'flight_price_history.csv');
+            const csvFilePath = path.join(RESULT_DIR, 'flight_price_history.csv');
+            await appendToCsvFile(csvFilePath, allFlightsData);
+            console.log(`✅ Saved ${allFlightsData.length} flights data to CSV`);
+        } catch (csvError) {
+            console.error(`Error saving CSV for all flights: ${csvError.message}`);
+        }
+    }
+
 
     const timeEndCrawl= Date.now();
     console.log(`⏱️ Time crawl: ${timeEndCrawl - timeStartCrawl} ms`);
@@ -299,4 +308,11 @@ export async function crawlData_byDate_from_BayDepPage(page, dateString, departu
         console.log(`🚀 Fast mode was enabled - reduced delays for speed optimization`);
     }
 
+    return { 
+        daily_results: allFlightsData,
+        summary: {
+            successfulCrawls,
+            itemsToProcess
+        }
+    };
 }

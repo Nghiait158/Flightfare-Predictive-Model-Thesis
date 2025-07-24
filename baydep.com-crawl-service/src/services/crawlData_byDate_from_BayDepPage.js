@@ -241,7 +241,6 @@ export async function crawlData_byDate_from_BayDepPage(page, dateString, departu
             };
             allFlightsData.push(flightData);
 
-
             // Delay tối ưu giữa các flight
             await delay(fastMode ? DELAY_MEDIUM : 300);
             

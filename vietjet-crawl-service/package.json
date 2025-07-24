@@ -8,9 +8,9 @@
         "csv-writer": "^1.6.0",
         "dotenv": "^17.0.1",
         "express": "^4.18.2",
-        "puppeteer": "^24.11.2",
-        "nodemon": "^3.1.10" 
-
+        "flightfare-predictive-model-thesis": "file:..",
+        "nodemon": "^3.1.10",
+        "puppeteer": "^24.11.2"
     },
     "scripts": {
         "start": "node app.js",
@@ -19,5 +19,11 @@
     "author": "Trinh Van Trung Nghia-ITITIU21254",
     "license": "ISC",
     "main": "app.js",
-    "keywords": ["crawling", "vietjet", "flight-price", "api", "microservice"]
+    "keywords": [
+        "crawling",
+        "vietjet",
+        "flight-price",
+        "api",
+        "microservice"
+    ]
 }

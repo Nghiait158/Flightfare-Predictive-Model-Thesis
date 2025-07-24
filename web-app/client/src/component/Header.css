@@ -1,0 +1,65 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 40px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin: 20px;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo-icon-placeholder {
+  width: 40px;
+  height: 40px;
+  background-color: #4a90e2;
+  border-radius: 50%;
+  margin-right: 10px;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9 9 4.03 9 9zm-17.61 3.32c.33 1.05.82 2.02 1.41 2.87l1.79-1.79c-.1-.56-.16-1.15-.16-1.76 0-1.02.24-1.98.68-2.82l-2.07-1.2C1.59 9.87 1.39 10.93 1.39 12c0 .41.04.81.12 1.2.05.25.11.5.18.74l-.08-.62zM12 4c-1.9 0-3.63.58-5.05 1.59l1.45 1.45C9.37 6.42 10.62 6 12 6s2.63.42 3.6 1.04l1.45-1.45C15.63 4.58 13.9 4 12 4zm8.61 11.32c.07-.49.11-.99.11-1.5 0-1.07-.2-2.09-.57-3.02l-2.07 1.2c.44.84.68 1.8.68 2.82 0 .61-.06 1.2-.16 1.76l1.79 1.79c.59-.85 1.08-1.82 1.41-2.87l.01-.08zM19.95 9.41C18.47 5.96 15.48 4 12 4s-6.47 1.96-7.95 5.41l1.45-1.45c1.1-1.32 2.7-2.16 4.5-2.16s3.4.84 4.5 2.16l1.45 1.45zM2.82 17.18l1.79-1.79c-.56-.1-.16-1.15-.16-1.76 0-1.02.24-1.98.68-2.82L2.07 9.6C1.59 10.13 1.39 11.07 1.39 12c0 .41.04.81.12 1.2l1.31 3.98z"/><path d="M15.5 10.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zm-3.95-3.95L9.6 4.6l-1.95 1.95 1.95 1.95 1.95-1.95z"/></svg>');
+  background-size: 60%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+
+.logo-text {
+  font-size: 24px;
+  font-weight: bold;
+  color: #000;
+}
+
+.logo-text span {
+    font-weight: normal;
+}
+
+.nav-links a {
+  margin: 0 20px;
+  text-decoration: none;
+  color: #000;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.nav-links a:hover {
+  color: #4a90e2;
+}
+
+.register-button {
+  background-color: #000;
+  color: #fff;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.register-button:hover {
+  background-color: #333;
+} 

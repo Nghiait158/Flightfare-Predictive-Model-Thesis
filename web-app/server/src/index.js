@@ -1,18 +1,34 @@
-const express = require('express');
-const cors = require('cors');
+try {
+  const express = require('express');
+  const cors = require('cors');
 
-const app = express();
-const PORT = process.env.PORT || 3001; // Port cho backend
+  const app = express();
+  const PORT = process.env.PORT || 3003;
 
-// Middlewares
-app.use(cors()); // Cho phép request từ các nguồn khác (quan trọng cho dev)
-app.use(express.json()); // Cho phép parse JSON
+  
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] Received ${req.method} request for ${req.url}`);
+    next(); 
+  });
 
-// API route mẫu
-app.get('/api/greeting', (req, res) => {
-  res.json({ message: "Hello from Backend!" });
-});
+  // Middlewares
+  app.use(cors()); // allow another rq
+  app.use(express.json()); 
 
-app.listen(PORT, () => {
-  console.log(`Backend server is running on http://localhost:${PORT}`);
-}); 
+  
+  // API 
+  app.get('/api/greeting', (req, res) => {
+    res.json({ message: "Message from Backend server" });
+  });
+
+  app.listen(PORT, () => {
+    console.log(`Backend server is running on http://localhost:${PORT}`);
+  });
+
+} catch (error) {
+
+  console.error("!!! FATAL ERROR OCCURRED !!!");
+  console.error(error);
+  process.exit(1); 
+
+} 

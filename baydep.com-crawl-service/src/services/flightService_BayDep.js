@@ -4,7 +4,7 @@ import { delay, DELAY_SHORT, DELAY_MEDIUM } from '../constants/constants.js';
 import {
     waitForVisible, 
 } from '../utils/domUtils.js';
-import { crawlData_byDate_from_BayDepPage } from './crawlData_byDate_from_BayDepPage.js';
+import { crawlData_byDate_from_BayDepPageV2 } from './crawlData_byDate_from_BayDepPageV2.js';
 import { appendToJsonFile } from '../utils/fileUtils.js';
 import { RESULT_DIR } from '../constants/paths.js';
 
@@ -178,12 +178,13 @@ export async function performFlightSearch_BayDep(page, departureAirport, arrival
         try {
             console.log('Appeared page for scraping');
             
-            await delay(10000);
+            await delay(16000);
             await scrollToBottom(page);
+            console.log('waiting----10000ms');
             
             // await delay(10000);
 
-            scriptResults = await crawlData_byDate_from_BayDepPage(page, departure_date, departureAirport, arrivalAirport, adult, child, infant, { fastMode: true, batchSize: 50 });
+            scriptResults = await crawlData_byDate_from_BayDepPageV2(page, departure_date, departureAirport, arrivalAirport, adult, child, infant, { fastMode: true, batchSize: 50 });
             
         } catch (error) {
             console.error('❌ Error executing crawler script:', error.message);

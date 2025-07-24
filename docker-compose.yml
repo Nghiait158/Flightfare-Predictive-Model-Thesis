@@ -39,6 +39,28 @@ services:
       - "traefik.http.routers.vietjet-crawl.rule=Host(`localhost`) && PathPrefix(`/api/v1/crawl/vietjet`)"
       - "traefik.http.services.vietjet-crawl.loadbalancer.server.port=3001"
 
+  # PostgreSQL Database Service
+  postgres-db:
+    image: postgres:14-alpine # Using a specific, lightweight version is good practice
+    container_name: flight_postgres_db
+    environment:
+      - POSTGRES_DB=flight_data
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5432:5432" # Maps the container's port 5432 to the host's port 5432
+    volumes:
+      - postgres_db_data:/var/lib/postgresql/data # Persists database data on the host
+    networks:
+      - flight_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trungnghia -d flight_data"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # API Gateway Service (placeholder for future implementation)
   # Uncomment when api-gateway-service is ready
   # api-gateway-service:
@@ -66,6 +88,40 @@ services:
   #     - "traefik.http.routers.api-gateway.rule=Host(`localhost`)"
   #     - "traefik.http.services.api-gateway.loadbalancer.server.port=3000"
 
+  # BayDep.com Crawl Service
+  baydep-crawl-service:
+    build:
+      context: ./baydep.com-crawl-service
+      dockerfile: Dockerfile
+    container_name: baydep-crawl-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+      - PUPPETEAR_EXECUTABLE_PATH=/usr/bin/chromium-browser
+    volumes:
+      - ./baydep.com-crawl-service/result:/app/result
+      - ./baydep.com-crawl-service/screenshot:/app/screenshot
+      - ./flight-config.json:/app/flight-config.json
+      - ./airports.csv:/app/airports.csv
+      - baydep_crawler_storage:/app/storage
+      - /dev/shm:/dev/shm
+    networks:
+      - flight_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/check-health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.baydep-crawl.rule=Host(`localhost`) && PathPrefix(`/api/v1/crawl/baydep.com`)"
+      - "traefik.http.services.baydep-crawl.loadbalancer.server.port=3002"
+
 # Networks
 networks:
   flight_network:
@@ -77,6 +133,10 @@ volumes:
   crawler_storage:
     driver: local
     name: vietjet_crawler_storage
+  baydep_crawler_storage:
+    driver: local
+    name: baydep_crawler_storage
+  postgres_db_data: {} # Defines the volume for PostgreSQL data persistence
 
 # Named volumes are no longer needed as we are using bind mounts
 # volumes:

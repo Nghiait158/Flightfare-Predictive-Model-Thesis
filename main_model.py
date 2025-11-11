@@ -39,7 +39,26 @@ class FlightPricePredictor:
         column_names = ['create_at', 'flight_number', 'type_of_plane', 'departure_airport', 
                        'arrival_airport', 'flight_date', 'departure_time', 'arrival_time', 'classes', 'price']
         
-        self.df = pd.read_csv(self.csv_file, names=column_names, skiprows=1)
+        self.df = pd.read_csv(
+            self.csv_file,
+            header=0,
+            usecols=[
+                'create_at', 'flight_number', 'type_of_plane', 'departure_airport',
+                'arrival_airport', 'flight_date', 'departure_time', 'arrival_time',
+                'classes', 'price'
+            ],
+            sep=',',
+            quotechar='"',
+            engine='python',
+            on_bad_lines='skip'
+        )
+        
+        # Normalize dtypes
+        self.df['price'] = pd.to_numeric(self.df['price'], errors='coerce')
+        for col in ['flight_number', 'type_of_plane', 'departure_airport', 'arrival_airport',
+                    'departure_time', 'arrival_time', 'classes']:
+            if col in self.df.columns:
+                self.df[col] = self.df[col].astype(str)
         print(f"{self.df.shape[0]} data rows")
         
         initial_rows = len(self.df)
@@ -91,8 +110,8 @@ class FlightPricePredictor:
         self.df['flight_date'] = self.df['flight_date'].apply(parse_flight_date)
         self.df = self.df.dropna(subset=['flight_date'])
 
-        #delete ' ' 
-        self.df['type_of_plane'] = self.df['type_of_plane'].str.strip()
+        #delete ' '
+        self.df['type_of_plane'] = self.df['type_of_plane'].fillna('').astype(str).str.strip()
         self.df = self.df[self.df['type_of_plane'] != '']
         self.df = self.df.dropna(subset=['type_of_plane'])
 
@@ -540,6 +559,6 @@ def test_saved_model():
         traceback.print_exc()
 
 if __name__ == "__main__":
-    predictor = FlightPricePredictor('flightfare-predictiveScraping-model/result/flight_price_history.csv')
+    predictor = FlightPricePredictor('result/flight_price_history.csv')
     best_model, results = predictor.run_complete_pipeline()
     test_saved_model()

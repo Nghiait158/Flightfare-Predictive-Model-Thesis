@@ -1,0 +1,41 @@
+{
+  "name": "flight-price-prediction-monolith",
+  "version": "1.0.0",
+  "description": "Flight Price Prediction System - Monolithic Architecture",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "dev:client": "cd web-app/client && npm start",
+    "build:client": "cd web-app/client && npm install && npm run build",
+    "deploy": "npm run build:client && cross-env NODE_ENV=production npm start",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "flight",
+    "price",
+    "prediction",
+    "crawler",
+    "machine-learning"
+  ],
+  "author": "Trinh Van Trung Nghia - ITITIU21254",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "crawlee": "^3.0.0",
+    "csv-writer": "^1.6.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "pg": "^8.16.3",
+    "puppeteer": "^24.11.2",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

@@ -1,0 +1,127 @@
+.header-nav {  
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  /* Transparent background - video shows through from App level */
+  /* background: rgba(15, 23, 42, 0.2); */
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 100;
+  transition: all 0.3s ease;
+}
+
+.header-nav.scrolled {
+  /* background: rgba(15, 23, 42, 0.85); */
+  /* border-bottom-color: rgba(59, 130, 246, 0.3); */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.header-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.logo-icon-wrapper {
+  background: linear-gradient(to bottom right, #60a5fa, #22d3ee);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.plane-icon {
+  height: 24px;
+  width: 24px;
+  color: #0f172a;
+}
+.logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.025em;
+}
+.header-menu {
+  display: none;
+  align-items: center;
+  gap: 32px;
+}
+.menu-link {
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 500;
+  transition: color 0.2s ease;
+  position: relative;
+}
+
+.menu-link:hover {
+  color: white;
+}
+
+.menu-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(to right, #60a5fa, #22d3ee);
+  transition: width 0.3s ease;
+}
+
+.menu-link:hover::after {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .header-container {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+@media (min-width: 768px) {
+  .header-menu {
+    display: flex;
+  }
+}
+@media (min-width: 1024px) {
+  .header-container {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+@media (max-width: 767px) {
+  .header-menu {
+    display: none;
+  }
+  
+}
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.header-nav {
+  animation: slideDown 0.3s ease-out;
+}
+

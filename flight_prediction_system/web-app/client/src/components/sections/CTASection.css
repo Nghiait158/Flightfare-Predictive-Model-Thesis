@@ -1,0 +1,113 @@
+.cta-section {
+  /* py-24 px-4 sm:px-6 lg:px-8 relative */
+  padding-top: 96px;
+  padding-bottom: 96px;
+  padding-left: 16px;
+  padding-right: 16px;
+  position: relative;
+}
+
+.cta-background {
+  /* absolute inset-0 opacity-10 */
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+.cta-blur-circle {
+  /* absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-400 rounded-full blur-3xl */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 384px;
+  height: 384px;
+  background: #60a5fa;
+  border-radius: 9999px;
+  filter: blur(96px);
+}
+
+.cta-container {
+  /* max-w-3xl mx-auto text-center relative z-10 */
+  max-width: 768px;
+  margin: 0 auto;
+  text-align: center;
+  position: relative;
+  z-index: 10;
+}
+
+.cta-title {
+  /* text-4xl md:text-5xl font-bold text-white mb-6 */
+  font-size: 36px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 24px;
+}
+
+.cta-description {
+  /* text-xl text-slate-300 mb-8 */
+  font-size: 20px;
+  color: #cbd5e1;
+  margin-bottom: 32px;
+  line-height: 1.75;
+}
+
+.cta-button {
+  /* bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 */
+  background: linear-gradient(to right, #3b82f6, #22d3ee);
+  
+  /* text-white px-8 h-12 text-lg font-semibold rounded-lg */
+  color: white;
+  padding: 0 32px;
+  height: 48px;
+  font-size: 18px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  
+  /* inline-flex items-center gap */
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.cta-button:hover {
+  background: linear-gradient(to right, #2563eb, #06b6d4);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+              0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
+
+.cta-arrow {
+  height: 20px;
+  width: 20px;
+}
+
+/* Responsive */
+@media (min-width: 640px) {
+  .cta-section {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (min-width: 768px) {
+  .cta-title {
+    font-size: 48px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .cta-section {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+

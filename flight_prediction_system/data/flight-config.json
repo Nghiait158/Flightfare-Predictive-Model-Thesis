@@ -1,0 +1,13 @@
+{
+  "departure_airport": "SGN",
+  "arrival_airport": "HAN",
+  "search_options": {
+    "trip_type": "oneway",
+    "find_cheapest": false,
+    "departure_date": "17022026"
+  },
+  "adult": 1,
+  "child": 1,
+  "infant": 0,
+  "updated_at": "2025-11-18T15:08:15.908Z"
+}

@@ -1,0 +1,141 @@
+.airport-autocomplete-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.airport-input {
+  width: 100%;
+}
+
+.suggestions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  margin: 4px 0 0 0;
+  padding: 0;
+  list-style: none;
+  background: rgba(30, 41, 59, 0.98);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  border-radius: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.suggestion-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.highlighted {
+  background: rgba(34, 211, 238, 0.15);
+}
+
+.suggestion-item.highlighted {
+  border-left: 3px solid #22d3ee;
+}
+
+.suggestion-item.no-results {
+  color: #94a3b8;
+  cursor: default;
+  text-align: center;
+}
+
+.suggestion-item.no-results:hover {
+  background: transparent;
+  border-left: none;
+}
+
+.suggestion-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.suggestion-city {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  transition: color 0.2s ease;
+}
+
+.suggestion-item.highlighted .suggestion-city {
+  color: #22d3ee;
+}
+
+.suggestion-code {
+  font-size: 14px;
+  font-weight: 700;
+  color: #22d3ee;
+  background: rgba(34, 211, 238, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.suggestion-item.highlighted .suggestion-code {
+  background: rgba(34, 211, 238, 0.25);
+  color: white;
+}
+
+.suggestion-airport {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-top: 2px;
+}
+
+/* Scrollbar styling */
+.suggestions-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.suggestions-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.suggestions-list::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.3);
+  border-radius: 4px;
+}
+
+.suggestions-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.5);
+}
+
+/* Keyboard hint */
+.airport-input:focus {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.1);
+}
+
+/* Loading spinner */
+.loading-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(34, 211, 238, 0.3);
+  border-top-color: #22d3ee;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

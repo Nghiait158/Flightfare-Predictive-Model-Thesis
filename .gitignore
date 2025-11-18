@@ -1,2 +1,52 @@
+# Dependencies
 node_modules/
-vietjet-crawl-service/node_modules/
+package-lock.json
+
+# Environment files
+.env
+
+# Build files
+dist/
+build/
+src/client/build/
+
+# Data files (optional - uncomment if you don't want to track)
+# data/result/*.csv
+# data/result/*.json
+# screenshot/*.png
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Puppeteer
+.local-chromium/
+storage/
+
+
+*.mp4
+
+
+

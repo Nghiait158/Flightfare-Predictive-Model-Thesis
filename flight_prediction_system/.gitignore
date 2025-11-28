@@ -10,11 +10,6 @@ dist/
 build/
 src/client/build/
 
-# Data files (optional - uncomment if you don't want to track)
-# data/result/*.csv
-# data/result/*.json
-# screenshot/*.png
-
 # Logs
 logs/
 *.log

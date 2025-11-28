@@ -83,7 +83,7 @@ const SearchForm = ({ onSubmit }) => {
       const tempPassengers = { ...prev, [type]: newValue };
       const { adult, child, infant } = tempPassengers;
       if (infant > adult) return prev;
-      const childrenPerAdult = (child + infant) / adult;
+      // Validation rules for children per adult
       if (infant > 0) {
         if (child > adult) return prev;
       } else {

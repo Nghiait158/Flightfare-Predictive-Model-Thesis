@@ -57,6 +57,23 @@
   border-left: none;
 }
 
+.suggestion-item.suggestion-header {
+  background: rgba(34, 211, 238, 0.1);
+  cursor: default;
+  pointer-events: none;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 2px solid rgba(34, 211, 238, 0.3);
+}
+
+.suggestion-count {
+  font-size: 12px;
+  color: #22d3ee;
+  font-weight: 500;
+  text-align: center;
+}
+
 .suggestion-main {
   display: flex;
   justify-content: space-between;

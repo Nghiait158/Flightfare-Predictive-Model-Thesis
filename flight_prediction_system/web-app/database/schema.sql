@@ -83,6 +83,7 @@ CREATE TABLE flight_prices (
     price_id SERIAL PRIMARY KEY,
     schedule_id INTEGER REFERENCES flight_schedules(schedule_id),
     class_id INTEGER REFERENCES new_classes(class_id),
+    flight_date DATE NOT NULL,
     price DECIMAL(12,2) NOT NULL,
     currency VARCHAR(3) DEFAULT 'VND',
     travel_day_of_week INTEGER,
@@ -135,6 +136,8 @@ CREATE INDEX idx_airports_city ON airports(city);
 CREATE INDEX idx_flight_schedules_departure ON flight_schedules(departure_airport_id);
 CREATE INDEX idx_flight_schedules_arrival ON flight_schedules(arrival_airport_id);
 CREATE INDEX idx_flight_prices_schedule ON flight_prices(schedule_id);
+CREATE INDEX idx_flight_prices_date ON flight_prices(flight_date);
+CREATE INDEX idx_flight_prices_schedule_date ON flight_prices(schedule_id, flight_date, class_id);
 CREATE INDEX idx_search_history_user ON search_history(user_id);
 CREATE INDEX idx_price_alerts_user ON price_alerts(user_id);
 

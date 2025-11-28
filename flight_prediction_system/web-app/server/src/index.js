@@ -26,6 +26,10 @@ try {
   // Airport routes
   app.use('/api/airports', airportRoutes);
 
+  // Flight routes
+  const flightRoutes = require('./routes/flightRoutes');
+  app.use('/api/flights', flightRoutes);
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });

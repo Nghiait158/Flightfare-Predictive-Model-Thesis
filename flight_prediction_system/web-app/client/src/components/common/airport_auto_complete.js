@@ -80,8 +80,9 @@ const AirportAutocomplete = ({
     onChange({ target: { name, value: '' } });
 
     if (searchValue.trim() === '') {
-      setSuggestions([]);
-      setShowSuggestions(false);
+      // Show all airports when input is empty
+      setSuggestions(allAirports);
+      setShowSuggestions(true);
       return;
     }
 
@@ -118,8 +119,16 @@ const AirportAutocomplete = ({
   };
 
   const handleFocus = () => {
-    if (inputValue && !selectedAirport) {
-      setShowSuggestions(true);
+    // Show all airports when focused
+    if (!selectedAirport) {
+      if (inputValue) {
+        // If there's input, show current suggestions
+        setShowSuggestions(true);
+      } else {
+        // If no input, show all airports
+        setSuggestions(allAirports);
+        setShowSuggestions(true);
+      }
     }
   };
 
@@ -177,6 +186,13 @@ const AirportAutocomplete = ({
       
       {showSuggestions && suggestions.length > 0 && (
         <ul className="suggestions-list">
+          {/* {!inputValue && suggestions.length > 5 && (
+            <li className="suggestion-item suggestion-header">
+              <div className="suggestion-count">
+                📍 {suggestions.length} sân bay có sẵn - Scroll để xem thêm
+              </div>
+            </li>
+          )} */}
           {suggestions.map((airport, index) => (
             <li
               key={airport.code}

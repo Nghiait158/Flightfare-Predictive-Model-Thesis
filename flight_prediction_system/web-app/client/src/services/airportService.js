@@ -1,3 +1,5 @@
+import { airports as localAirports } from '../data/airports';
+
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 export const airportService = {
@@ -13,8 +15,9 @@ export const airportService = {
         throw new Error(data.message || 'Failed to fetch airports');
       }
     } catch (error) {
-      console.error('Error fetching airports:', error);
-      throw error;
+      console.warn('Error fetching airports from API, using local data:', error);
+      // Fallback to local data
+      return localAirports;
     }
   },
 
@@ -30,8 +33,14 @@ export const airportService = {
         throw new Error(data.message || 'Failed to search airports');
       }
     } catch (error) {
-      console.error('Error searching airports:', error);
-      throw error;
+      console.warn('Error searching airports from API, using local data:', error);
+      // Fallback to local search
+      const searchLower = query.toLowerCase();
+      return localAirports.filter(airport => 
+        airport.city.toLowerCase().includes(searchLower) ||
+        airport.name.toLowerCase().includes(searchLower) ||
+        airport.code.toLowerCase().includes(searchLower)
+      );
     }
   },
 

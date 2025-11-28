@@ -17,6 +17,9 @@ const SCREENSHOT_DIR = path.join(__dirname, '../../../screenshot');
 import * as baydepCrawler from '../crawlers/baydep/index.js';
 import * as vietjetCrawler from '../crawlers/vietjet/index.js';
 
+// Import database service
+import { saveFlightPricesToDB, isDatabaseAvailable } from '../services/flightPriceService.js';
+
 const router = express.Router();
 
 // Constants
@@ -66,6 +69,30 @@ function generateDateRange(startDateStr, days) {
     }
     
     return dates;
+}
+
+/**
+ * Convert date from DDMMYYYY to DD/MM/YYYY format (for VietJet crawler)
+ * @param {string} dateStr - Date string in DDMMYYYY format (e.g., "08122025")
+ * @returns {string} Date string in DD/MM/YYYY format (e.g., "08/12/2025")
+ */
+function convertToSlashFormat(dateStr) {
+    if (!dateStr) return dateStr;
+    
+    // Already in DD/MM/YYYY format
+    if (dateStr.includes('/')) {
+        return dateStr;
+    }
+    
+    // Convert DDMMYYYY to DD/MM/YYYY
+    if (dateStr.length === 8) {
+        const day = dateStr.substring(0, 2);
+        const month = dateStr.substring(2, 4);
+        const year = dateStr.substring(4, 8);
+        return `${day}/${month}/${year}`;
+    }
+    
+    throw new Error(`Invalid date format: ${dateStr}. Expected DDMMYYYY or DD/MM/YYYY`);
 }
 
 /**
@@ -334,6 +361,31 @@ router.post('/baydep', async (req, res) => {
                     console.error(`❌ Failed to crawl date ${currentDate}: ${dateCrawlerResult.error || 'Unknown error'}`);
                 } else {
                     console.log(`✅ Successfully crawled date ${currentDate}`);
+                    
+                    // Debug: Check conditions
+                    console.log(`🔍 DB Save Check - crawlDays: ${crawlDays}, hasResults: ${!!dateCrawlerResult.results}, hasDailyResults: ${!!(dateCrawlerResult.results && dateCrawlerResult.results.daily_results)}`);
+                    
+                    // Save to database ONLY for user searches (not batch crawls)
+                    if (crawlDays === 0 && dateCrawlerResult.results && dateCrawlerResult.results.daily_results) {
+                        try {
+                            console.log(`💾 User search detected - saving to database...`);
+                            const dbResult = await saveFlightPricesToDB(
+                                dateCrawlerResult.results.daily_results,
+                                dateSpecificConfig,
+                                'user_search'
+                            );
+                            console.log(`✅ Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
+                        } catch (dbError) {
+                            console.error(`⚠️  Failed to save to database: ${dbError.message}`);
+                            console.error(`🔍 DB Error stack: ${dbError.stack}`);
+                            console.log(`📁 Data is still saved in JSON file as backup`);
+                            // Don't throw - continue execution even if DB fails
+                        }
+                    } else if (crawlDays > 0) {
+                        console.log(`📦 Batch crawl mode - data saved to file only (not database)`);
+                    } else {
+                        console.log(`⚠️  DB save skipped - conditions not met`);
+                    }
                 }
                 
                 // Reset page state for next crawl (important for multi-date crawling)
@@ -632,14 +684,15 @@ router.post('/vietjet', async (req, res) => {
         }
 
         // Update flight configuration with request parameters
+        // Convert dates to DD/MM/YYYY format for VietJet crawler
         const updatedFlightConfig = {
             departure_airport: departure_airport.toUpperCase(),
             arrival_airport: arrival_airport.toUpperCase(),
             search_options: {
                 trip_type,
                 find_cheapest,
-                departure_date,
-                ...(trip_type === 'roundtrip' && return_date && { return_date })
+                departure_date: convertToSlashFormat(departure_date),
+                ...(trip_type === 'roundtrip' && return_date && { return_date: convertToSlashFormat(return_date) })
             },
             adult,
             child,
@@ -731,6 +784,23 @@ router.post('/vietjet', async (req, res) => {
         console.log(`   • Steps completed: ${stats.stepsCompleted}`);
         console.log(`   • Screenshots taken: ${stats.screenshotsTaken}`);
         console.log(`   • Results available: ${stats.hasResults ? '✅' : '❌'}`);
+
+        // Save to database for VietJet user searches
+        if (crawlerResult.success && crawlerResult.results && crawlerResult.results.daily_results) {
+            try {
+                console.log(`💾 Saving VietJet search results to database...`);
+                const dbResult = await saveFlightPricesToDB(
+                    crawlerResult.results.daily_results,
+                    updatedFlightConfig,
+                    'user_search'
+                );
+                console.log(`✅ Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
+            } catch (dbError) {
+                console.error(`⚠️  Failed to save to database: ${dbError.message}`);
+                console.log(`📁 Data is still saved in JSON file as backup`);
+                // Don't throw - continue execution even if DB fails
+            }
+        }
 
         // Prepare API response
         const apiResponse = {
@@ -837,12 +907,67 @@ router.post('/vietjet', async (req, res) => {
  * GET /api/crawl/health
  * Health check endpoint
  */
-router.get('/health', (req, res) => {
+router.get('/health', async (req, res) => {
+    const dbAvailable = await isDatabaseAvailable();
+    
     res.json({
         status: 'OK',
         timestamp: new Date().toISOString(),
-        service: 'flight-prediction-monolith'
+        service: 'flight-prediction-monolith',
+        database: {
+            available: dbAvailable,
+            status: dbAvailable ? 'connected' : 'unavailable',
+            note: 'User searches saved to DB when available, batch crawls saved to file'
+        }
     });
+});
+
+/**
+ * GET /api/crawl/db-test
+ * Test database connection and basic queries
+ */
+router.get('/db-test', async (req, res) => {
+    try {
+        const dbAvailable = await isDatabaseAvailable();
+        
+        if (!dbAvailable) {
+            return res.status(503).json({
+                success: false,
+                message: 'Database is not available',
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        // Test query to check tables
+        const { default: pool } = await import('../../../web-app/server/src/config/database.js');
+        
+        const airportsCount = await pool.query('SELECT COUNT(*) FROM airports');
+        const airlinesCount = await pool.query('SELECT COUNT(*) FROM airlines');
+        const classesCount = await pool.query('SELECT COUNT(*) FROM new_classes');
+        const schedulesCount = await pool.query('SELECT COUNT(*) FROM flight_schedules');
+        const pricesCount = await pool.query('SELECT COUNT(*) FROM flight_prices');
+        
+        res.json({
+            success: true,
+            message: 'Database connection is working',
+            tables: {
+                airports: parseInt(airportsCount.rows[0].count),
+                airlines: parseInt(airlinesCount.rows[0].count),
+                classes: parseInt(classesCount.rows[0].count),
+                schedules: parseInt(schedulesCount.rows[0].count),
+                prices: parseInt(pricesCount.rows[0].count)
+            },
+            timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            message: 'Database test failed',
+            timestamp: new Date().toISOString()
+        });
+    }
 });
 
 export default router;

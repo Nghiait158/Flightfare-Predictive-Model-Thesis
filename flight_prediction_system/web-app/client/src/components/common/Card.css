@@ -1,0 +1,39 @@
+/* Base Card Styles */
+.card {
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+/* Variants */
+.card--default {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.card--elevated {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.card--bordered {
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Hoverable */
+.card--hoverable {
+  cursor: pointer;
+}
+
+.card--hoverable:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(59, 130, 246, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+

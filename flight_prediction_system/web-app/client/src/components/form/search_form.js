@@ -3,13 +3,23 @@ import Input from '../common/input';
 import AirportAutocomplete from '../common/airport_auto_complete';
 import './search_form.css';
 
-const SearchForm = ({ onSubmit }) => {
+const SearchForm = ({ onSubmit, onFromChange, onToChange, selectedTo }) => {
   const [formData, setFormData] = useState({
     from: '',
     to: '',
     departDate: '',
     returnDate: ''
   });
+
+  // Update 'to' field when selectedTo changes from PopularDestinations
+  useEffect(() => {
+    if (selectedTo && selectedTo !== formData.to) {
+      setFormData(prev => ({
+        ...prev,
+        to: selectedTo
+      }));
+    }
+  }, [selectedTo]);
   
   const [tripType, setTripType] = useState('one-way'); // 'return' or 'one-way'
   
@@ -29,7 +39,6 @@ const SearchForm = ({ onSubmit }) => {
     return today.toISOString().split('T')[0];
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (passengerRef.current && !passengerRef.current.contains(event.target)) {
@@ -61,6 +70,14 @@ const SearchForm = ({ onSubmit }) => {
       
       return updated;
     });
+
+    // Notify parent component of changes
+    if (name === 'from' && onFromChange) {
+      onFromChange(value);
+    }
+    if (name === 'to' && onToChange) {
+      onToChange(value);
+    }
   };
 
   const handleTripTypeChange = (e) => {

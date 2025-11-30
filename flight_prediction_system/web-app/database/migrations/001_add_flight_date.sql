@@ -23,3 +23,5 @@ ON flight_prices(schedule_id, flight_date, class_id);
 
 
 
+
+

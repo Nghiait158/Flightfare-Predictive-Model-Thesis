@@ -40,7 +40,7 @@
 
 .main-container {
   max-width: 1280px;
-  margin: -150px auto 0;
+  margin: 100px auto 0;
   padding-left: 16px;
   padding-right: 16px;
   position: relative;
@@ -93,11 +93,27 @@
   max-width: 672px;
   margin: 0 auto 32px;
   line-height: 1.75;
+  transition: all 0.4s ease;
+  opacity: 1;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.main-description.hidden {
+  opacity: 0;
+  max-height: 0;
+  margin-bottom: 0;
+  pointer-events: none;
 }
 
 .main-search {
   max-width: 896px;
   margin: 0 auto;
+  transition: all 0.4s ease;
+}
+
+.main-search.compact {
+  margin-top: 5px;
 }
 
 @media (min-width: 640px) {

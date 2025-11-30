@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './SearchResults.css';
 import Header from '../components/layout/header';
@@ -8,17 +8,16 @@ import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
 import Select from '../components/common/Select';
 import Checkbox from '../components/common/Checkbox';
+import EditSearchForm from '../components/form/EditSearchForm';
 import flightService from '../services/flightService';
 import crawlerService from '../services/crawlerService';
 
-// Debug: Log crawler URL on component mount
-console.log('🔧 SearchResults: REACT_APP_CRAWLER_URL =', process.env.REACT_APP_CRAWLER_URL);
 
 const SearchResults = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const editFormRef = useRef(null);
   
-  // Get search params from navigation state or URL
   const initialSearchParams = location.state?.searchParams || {
     from: 'SGN',
     to: 'HAN',
@@ -54,13 +53,14 @@ const SearchResults = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [airlines, setAirlines] = useState([]);
   const [flightClasses, setFlightClasses] = useState([]);
+  const [dataFreshness, setDataFreshness] = useState(null);
 
   const itemsPerPage = 10;
 
   const crawlAndRetry = useCallback(async () => {
     try {
       setCrawling(true);
-      setCrawlMessage('Không tìm thấy giá vé trong database. Đang tìm kiếm giá vé mới nhất...');
+      setCrawlMessage('No flight prices found in database. Searching for latest prices...');
       
       console.log('🚀 Starting automatic crawl...');
       console.log('🔍 Search params:', searchParams);
@@ -71,7 +71,7 @@ const SearchResults = () => {
       
       if (crawlResult.success) {
         console.log('✅ Crawl successful, fetching flights again...');
-        setCrawlMessage('Đã tìm thấy giá vé! Đang tải dữ liệu...');
+        setCrawlMessage('Flight prices found! Loading data...');
         
         // Wait a bit for database to be updated
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -85,14 +85,14 @@ const SearchResults = () => {
       console.error('❌ Crawl error:', err);
       
       // More user-friendly error with suggestions
-      let errorMessage = 'Không thể tìm kiếm giá vé mới. ';
+      let errorMessage = 'Unable to search for new flight prices. ';
       
       if (err.message.includes('Network Error') || err.code === 'ECONNREFUSED') {
-        errorMessage += 'Không thể kết nối tới crawler server. Vui lòng kiểm tra xem crawler server có đang chạy không (port 3000).';
+        errorMessage += 'Cannot connect to crawler server. Please check if the crawler server is running (port 3000).';
       } else if (err.message.includes('timeout')) {
-        errorMessage += 'Quá trình tìm kiếm mất quá nhiều thời gian. Vui lòng thử lại.';
+        errorMessage += 'Search is taking too long. Please try again.';
       } else {
-        errorMessage += 'Vui lòng thử lại sau hoặc chọn ngày khác.';
+        errorMessage += 'Please try again later or choose a different date.';
       }
       
       setError(errorMessage);
@@ -116,6 +116,11 @@ const SearchResults = () => {
       console.log('API Response:', response);
       
       if (response.success) {
+        // Store data freshness info
+        if (response.data.dataFreshness) {
+          setDataFreshness(response.data.dataFreshness);
+        }
+
         // Check if we got any flights
         if (response.data.flights.length === 0 && !skipCrawl) {
           // No flights found - trigger automatic crawl
@@ -126,6 +131,12 @@ const SearchResults = () => {
             return fetchFlights(true);
           }
           return; // Exit early if crawl failed
+        }
+
+        // Check if data is stale and auto-refresh if needed
+        if (response.data.dataFreshness?.isStale && !skipCrawl && response.data.flights.length > 0) {
+          console.log('⚠️ Data is stale, suggesting refresh...');
+          // Don't auto-crawl for stale data, just show the data with refresh option
         }
 
         setFlights(response.data.flights);
@@ -330,10 +341,40 @@ const SearchResults = () => {
     setShowEditModal(true);
   };
 
-  const handleSaveSearch = () => {
-    setSearchParams(modalData);
-    setShowEditModal(false);
-    setCurrentPage(1);
+  const handleRefreshPrices = async () => {
+    setCrawling(true);
+    setCrawlMessage('Refreshing latest prices...');
+    
+    try {
+      const crawlSuccess = await crawlAndRetry();
+      if (crawlSuccess) {
+        await fetchFlights(true);
+      }
+    } catch (err) {
+      console.error('Error refreshing prices:', err);
+    } finally {
+      setCrawling(false);
+      setCrawlMessage('');
+    }
+  };
+
+  const handleSaveSearch = (updatedParams) => {
+    // Only process if we receive actual form data (not an event object)
+    if (updatedParams && updatedParams.from && updatedParams.to) {
+      setSearchParams(updatedParams);
+      setModalData(updatedParams);
+      setShowEditModal(false);
+      setCurrentPage(1);
+    }
+  };
+
+  const handleSubmitEditForm = () => {
+    // Trigger form submission by calling the form's submit method
+    if (editFormRef.current) {
+      editFormRef.current.dispatchEvent(
+        new Event('submit', { cancelable: true, bubbles: true })
+      );
+    }
   };
 
   const formatPrice = (price) => {
@@ -359,14 +400,14 @@ const SearchResults = () => {
         <div className="search-results">
           <div className="search-results__loading">
             <div className="spinner"></div>
-            <p>{crawlMessage || 'Đang tìm kiếm chuyến bay...'}</p>
+            <p>{crawlMessage || 'Searching for flights...'}</p>
             {crawling && (
               <div className="crawl-info">
                 <p className="crawl-info__note">
-                  ⏱️ Quá trình này có thể mất 30-60 giây
+                  ⏱️ This process may take 30-60 seconds
                 </p>
                 <p className="crawl-info__detail">
-                  Đang thu thập giá vé mới nhất từ các hãng hàng không...
+                  Collecting latest prices from airlines...
                 </p>
               </div>
             )}
@@ -382,26 +423,26 @@ const SearchResults = () => {
         <Header />
         <div className="search-results">
         <div className="search-results__error">
-          <h2>❌ Có lỗi xảy ra</h2>
+          <h2>❌ An Error Occurred</h2>
           <p>{error}</p>
           <div className="error-actions">
             <Button variant="secondary" onClick={() => {
               setError(null);
               fetchFlights(true); // Try again without crawl
             }}>
-              🔄 Thử lại
+              🔄 Try Again
             </Button>
             <Button onClick={() => navigate('/')}>
-              ← Quay về trang chủ
+              ← Back to Home
             </Button>
           </div>
           
           {/* Troubleshooting tips */}
           <div className="error-tips">
-            <h3> Gợi ý khắc phục:</h3>
+            <h3>💡 Troubleshooting Tips:</h3>
             <ul>
-              <li>Thử tìm kiếm với ngày khác</li>
-              <li>Kiểm tra kết nối internet</li>
+              <li>Try searching with a different date</li>
+              <li>Check your internet connection</li>
             </ul>
           </div>
         </div>
@@ -426,18 +467,41 @@ const SearchResults = () => {
               <span className="search-info__date">{formatDate(searchParams.departDate)}</span>
               <span className="search-info__divider">|</span>
               <span className="search-info__passengers">
-                {searchParams.adults} Người lớn
-                {searchParams.children > 0 && `, ${searchParams.children} Trẻ em`}
-                {searchParams.infants > 0 && `, ${searchParams.infants} Em bé`}
+                {searchParams.adults} Adult{searchParams.adults > 1 ? 's' : ''}
+                {searchParams.children > 0 && `, ${searchParams.children} Child${searchParams.children > 1 ? 'ren' : ''}`}
+                {searchParams.infants > 0 && `, ${searchParams.infants} Infant${searchParams.infants > 1 ? 's' : ''}`}
               </span>
             </div>
-            <Button size="sm" onClick={handleEditSearch}>
-              Chỉnh sửa
-            </Button>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {dataFreshness && dataFreshness.isStale && (
+                <span style={{ 
+                  fontSize: '12px', 
+                  color: '#fbbf24',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}>
+                  ⚠️ Data is {Math.round(dataFreshness.oldestDataHours)}h old
+                </span>
+              )}
+              {dataFreshness && dataFreshness.isStale && (
+                <Button 
+                  size="sm" 
+                  variant="secondary" 
+                  onClick={handleRefreshPrices}
+                  disabled={crawling}
+                >
+                  🔄 Refresh Prices
+                </Button>
+              )}
+              <Button size="sm" onClick={handleEditSearch}>
+                Edit Search
+              </Button>
+            </div>
           </div>
 
           <div className="search-controls">
-            <div className="view-toggle">
+            {/* <div className="view-toggle">
               <Button
                 variant={viewMode === 'list' ? 'primary' : 'ghost'}
                 size="sm"
@@ -452,18 +516,18 @@ const SearchResults = () => {
               >
                 ⊞
               </Button>
-            </div>
+            </div> */}
 
             <Select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               options={[
-                { value: 'recommended', label: '✨ Đề xuất' },
-                { value: 'price-low', label: '💰 Giá tăng dần' },
-                { value: 'price-high', label: '💰 Giá giảm dần' },
-                { value: 'duration', label: '⏱️ Thời gian bay' },
-                { value: 'departure-early', label: '🕐 Khởi hành sớm nhất' },
-                { value: 'departure-late', label: '🕐 Khởi hành muộn nhất' }
+                { value: 'recommended', label: 'Recommended' },
+                { value: 'price-low', label: 'Price: Low to High' },
+                { value: 'price-high', label: 'Price: High to Low' },
+                { value: 'duration', label: 'Flight Duration' },
+                { value: 'departure-early', label: 'Earliest Departure' },
+                { value: 'departure-late', label: 'Latest Departure' }
               ]}
             />
           </div>
@@ -476,20 +540,20 @@ const SearchResults = () => {
         <aside className="filters-sidebar">
           <Card>
             <div className="filters-sidebar__breadcrumb">
-              <span>Trang chủ</span>
+              <span>Home</span>
               <span>›</span>
-              <span>Kết quả</span>
+              <span>Results</span>
               <span>›</span>
               <span>{searchParams.from} → {searchParams.to}</span>
             </div>
 
             <div className="filters-sidebar__count">
-              <span>{filteredFlights.length} chuyến bay</span>
+              <span>{filteredFlights.length} flight{filteredFlights.length !== 1 ? 's' : ''}</span>
             </div>
 
-            {/* Price Range */}
+            {/* Price Range  */}
             <div className="filter-group">
-              <h3 className="filter-group__title">💰 Khoảng giá</h3>
+              <h3 className="filter-group__title">Price Range</h3>
               <div className="filter-group__content">
                 <div className="price-range">
                   <div className="price-range__labels">
@@ -524,7 +588,7 @@ const SearchResults = () => {
             {airlines.length > 0 && (
               <>
                 <div className="filter-group">
-                  <h3 className="filter-group__title">✈️ Hãng hàng không</h3>
+                  <h3 className="filter-group__title">Airlines</h3>
                   <div className="filter-group__content">
                     {airlines.map(airline => (
                       <Checkbox
@@ -542,13 +606,13 @@ const SearchResults = () => {
 
             {/* Departure Time */}
             <div className="filter-group">
-              <h3 className="filter-group__title">🕐 Giờ khởi hành</h3>
+              <h3 className="filter-group__title">Departure Time</h3>
               <div className="filter-group__content">
                 {[
-                  { value: 'morning', label: 'Sáng (6h - 12h)' },
-                  { value: 'afternoon', label: 'Chiều (12h - 18h)' },
-                  { value: 'evening', label: 'Tối (18h - 24h)' },
-                  { value: 'night', label: 'Đêm (0h - 6h)' }
+                  { value: 'morning', label: 'Morning (6AM - 12PM)' },
+                  { value: 'afternoon', label: 'Afternoon (12PM - 6PM)' },
+                  { value: 'evening', label: 'Evening (6PM - 12AM)' },
+                  { value: 'night', label: 'Night (12AM - 6AM)' }
                 ].map(time => (
                   <Checkbox
                     key={time.value}
@@ -564,12 +628,12 @@ const SearchResults = () => {
 
             {/* Duration */}
             <div className="filter-group">
-              <h3 className="filter-group__title">⏱️ Thời gian bay</h3>
+              <h3 className="filter-group__title">Flight Duration</h3>
               <div className="filter-group__content">
                 {[
-                  { value: 'short', label: 'Dưới 2.5 giờ' },
-                  { value: 'medium', label: '2.5 - 4 giờ' },
-                  { value: 'long', label: 'Trên 4 giờ' }
+                  { value: 'short', label: 'Under 2.5 hours' },
+                  { value: 'medium', label: '2.5 - 4 hours' },
+                  { value: 'long', label: 'Over 4 hours' }
                 ].map(duration => (
                   <Checkbox
                     key={duration.value}
@@ -585,12 +649,12 @@ const SearchResults = () => {
 
             {/* Stops */}
             <div className="filter-group">
-              <h3 className="filter-group__title">🛬 Điểm dừng</h3>
+              <h3 className="filter-group__title">Stops</h3>
               <div className="filter-group__content">
                 {[
-                  { value: '0', label: 'Bay thẳng' },
-                  { value: '1', label: '1 điểm dừng' },
-                  { value: '2', label: '2 điểm dừng' }
+                  { value: '0', label: 'Nonstop' },
+                  { value: '1', label: '1 Stop' },
+                  { value: '2', label: '2 Stops' }
                 ].map(stop => (
                   <Checkbox
                     key={stop.value}
@@ -607,7 +671,7 @@ const SearchResults = () => {
               <>
                 <div className="filter-divider"></div>
                 <div className="filter-group">
-                  <h3 className="filter-group__title">💺 Hạng vé</h3>
+                  <h3 className="filter-group__title">Ticket Class</h3>
                   <div className="filter-group__content">
                     {flightClasses.map(cls => (
                       <Checkbox
@@ -629,10 +693,10 @@ const SearchResults = () => {
           {paginatedFlights.length === 0 ? (
             <Card>
               <div className="flight-list__empty">
-                <h3>😔 Không tìm thấy chuyến bay phù hợp</h3>
+                <h3>No Matching Flights Found</h3>
                 {filteredFlights.length === 0 && flights.length > 0 ? (
                   <>
-                    <p>Không có chuyến bay nào khớp với các bộ lọc của bạn.</p>
+                    <p>No flights match your current filters.</p>
                     <Button onClick={() => setFilters({
                       priceMin: 0,
                       priceMax: 10000000,
@@ -642,12 +706,12 @@ const SearchResults = () => {
                       stops: [],
                       ticketClass: []
                     })}>
-                      Xóa bộ lọc
+                      Clear Filters
                     </Button>
                   </>
                 ) : (
                   <>
-                    <p>Không có dữ liệu giá vé cho tuyến bay và ngày bạn chọn.</p>
+                    <p>No flight price data available for the selected route and date.</p>
                     <div className="empty-actions">
                       <Button 
                         variant="primary"
@@ -656,21 +720,20 @@ const SearchResults = () => {
                           crawlAndRetry();
                         }}
                       >
-                        🔄 Tìm kiếm giá vé mới
+                        Search for New Prices
                       </Button>
                       <Button 
                         variant="secondary"
                         onClick={() => navigate('/')}
                       >
-                        ← Tìm kiếm lại
+                        ← Search Again
                       </Button>
                     </div>
                     <div className="empty-tips">
-                      <p className="tips-title">💡 Gợi ý:</p>
+                      <p className="tips-title">Tips:</p>
                       <ul>
-                        <li>Thử tìm kiếm với ngày khác</li>
-                        <li>Kiểm tra mã sân bay đúng chưa</li>
-                        <li>Crawler server cần đang chạy để tìm giá mới</li>
+                        <li>Try searching with a different date</li>
+                        <li>Check if airport codes are correct</li>
                       </ul>
                     </div>
                   </>
@@ -696,7 +759,7 @@ const SearchResults = () => {
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(currentPage - 1)}
                   >
-                    ← Trước
+                    ← Previous
                   </Button>
 
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
@@ -716,7 +779,7 @@ const SearchResults = () => {
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(currentPage + 1)}
                   >
-                    Sau →
+                    Next →
                   </Button>
                 </div>
               )}
@@ -727,10 +790,10 @@ const SearchResults = () => {
         {/* Price Summary Sidebar */}
         <aside className="summary-sidebar">
           <Card>
-            <h3 className="summary-sidebar__title">Tổng quan giá</h3>
+            <h3 className="summary-sidebar__title">Price Summary</h3>
             <div className="summary-sidebar__content">
               <div className="summary-item">
-                <span className="summary-item__label">Thấp nhất</span>
+                <span className="summary-item__label">Lowest</span>
                 <span className="summary-item__value">
                   {filteredFlights.length > 0
                     ? formatPrice(Math.min(...filteredFlights.flatMap(f => f.classes.map(c => c.price))))
@@ -738,7 +801,7 @@ const SearchResults = () => {
                 </span>
               </div>
               <div className="summary-item">
-                <span className="summary-item__label">Trung bình</span>
+                <span className="summary-item__label">Average</span>
                 <span className="summary-item__value">
                   {filteredFlights.length > 0
                     ? formatPrice(
@@ -752,7 +815,7 @@ const SearchResults = () => {
                 </span>
               </div>
               <div className="summary-item">
-                <span className="summary-item__label">Cao nhất</span>
+                <span className="summary-item__label">Highest</span>
                 <span className="summary-item__value">
                   {filteredFlights.length > 0
                     ? formatPrice(Math.max(...filteredFlights.flatMap(f => f.classes.map(c => c.price))))
@@ -761,9 +824,38 @@ const SearchResults = () => {
               </div>
               <div className="summary-divider"></div>
               <div className="summary-item">
-                <span className="summary-item__label">Kết quả</span>
+                <span className="summary-item__label">Results</span>
                 <span className="summary-item__value">{filteredFlights.length}</span>
               </div>
+              
+              {/* Data Freshness Info */}
+              {dataFreshness && (
+                <>
+                  <div className="summary-divider"></div>
+                  <div className="summary-item">
+                    <span className="summary-item__label">Data Age</span>
+                    <span className="summary-item__value" style={{ 
+                      color: dataFreshness.isStale ? '#fbbf24' : '#10b981',
+                      fontSize: '14px'
+                    }}>
+                      {dataFreshness.oldestDataHours < 1 
+                        ? `${Math.round(dataFreshness.oldestDataHours * 60)}m`
+                        : `${Math.round(dataFreshness.oldestDataHours)}h`}
+                    </span>
+                  </div>
+                  <div className="summary-note" style={{
+                    fontSize: '11px',
+                    color: dataFreshness.isStale ? '#fbbf24' : '#94a3b8',
+                    marginTop: '8px',
+                    padding: '8px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    borderRadius: '6px',
+                    lineHeight: '1.4'
+                  }}>
+                    {dataFreshness.isStale ? '⚠️ ' : '✓ '}{dataFreshness.message}
+                  </div>
+                </>
+              )}
             </div>
           </Card>
         </aside>
@@ -773,23 +865,26 @@ const SearchResults = () => {
       <Modal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        title="Chỉnh sửa tìm kiếm"
-        size="md"
+        title="Edit Search"
+        size="lg"
+        className="modal--edit-search"
         footer={
           <>
             <Button variant="secondary" onClick={() => setShowEditModal(false)}>
-              Hủy
+              Cancel
             </Button>
-            <Button onClick={handleSaveSearch}>
-              Tìm kiếm
+            <Button onClick={handleSubmitEditForm}>
+              Search Flights
             </Button>
           </>
         }
       >
-        <div className="edit-search-form">
-          {/* Add form fields here */}
-          <p>Form chỉnh sửa tìm kiếm sẽ được thêm vào đây</p>
-        </div>
+        <EditSearchForm
+          ref={editFormRef}
+          initialData={modalData}
+          onSubmit={handleSaveSearch}
+          onCancel={() => setShowEditModal(false)}
+        />
       </Modal>
       </div>
     </>
@@ -828,7 +923,7 @@ const FlightCard = ({ flight, formatPrice }) => {
           <div className="route-duration">{flight.duration}</div>
           <div className="route-line"></div>
           <div className="route-stops">
-            {flight.stops === 0 ? 'Bay thẳng' : `${flight.stops} dừng`}
+            {flight.stops === 0 ? 'Nonstop' : `${flight.stops} stop${flight.stops > 1 ? 's' : ''}`}
           </div>
         </div>
 
@@ -856,11 +951,11 @@ const FlightCard = ({ flight, formatPrice }) => {
       <div className="flight-card__footer">
         <div className="flight-card__badges">
           {flight.stops === 0 && (
-            <Badge variant="info" size="sm">✈️ Bay thẳng</Badge>
+            <Badge variant="info" size="sm">Nonstop</Badge>
           )}
         </div>
         <Button size="sm">
-          Chọn chuyến bay
+          Select Flight
         </Button>
       </div>
     </Card>

@@ -19,7 +19,6 @@ const AirportAutocomplete = ({
   const wrapperRef = useRef(null);
   const suggestionRefs = useRef([]);
 
-  // Close suggestions when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
@@ -46,7 +45,6 @@ const AirportAutocomplete = ({
     fetchAirports();
   }, []);
 
-  // Update input value when value prop changes
   useEffect(() => {
     if (value) {
       const airport = allAirports.find(a => a.code === value);
@@ -60,7 +58,6 @@ const AirportAutocomplete = ({
     }
   }, [value, allAirports]);
 
-  // Scroll highlighted item into view
   useEffect(() => {
     if (highlightedIndex >= 0 && suggestionRefs.current[highlightedIndex]) {
       suggestionRefs.current[highlightedIndex].scrollIntoView({

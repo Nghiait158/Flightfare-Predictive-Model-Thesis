@@ -60,9 +60,15 @@ body {
 }
 
 /* Make sure all content is above video */
-.App > *:not(.app-video-background) {
+.App > *:not(.app-video-background):not(nav) {
   position: relative;
   z-index: 1;
+}
+
+/* Header should stay fixed, not affected by App positioning */
+.App > nav.header-nav {
+  position: fixed;
+  z-index: 1000;
 }
 
 /* Smooth scrolling */

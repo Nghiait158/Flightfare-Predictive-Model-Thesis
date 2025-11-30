@@ -10,13 +10,13 @@ const CTASection = () => {
       </div>
 
       <div className="cta-container">
-        <h2 className="cta-title">Sẵn sàng để tiết kiệm tiền?</h2>
+        <h2 className="cta-title">Ready to Save Money?</h2>
         <p className="cta-description">
-          Bắt đầu tìm giá vé máy bay tốt nhất ngay hôm nay. Đăng ký miễn phí
-          và nhận thông báo giảm giá trong thời gian thực.
+          Start finding the best flight deals today. Sign up for free
+          and get real-time price drop notifications.
         </p>
         <button className="cta-button">
-          Bắt đầu ngay
+          Get Started
           <svg className="cta-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M5 12h14M12 5l7 7-7 7"/>
           </svg>

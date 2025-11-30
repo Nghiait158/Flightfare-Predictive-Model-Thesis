@@ -61,7 +61,8 @@ exports.searchFlights = async (req, res) => {
         fp.currency,
         fp.flight_date,
         fp.checked_at,
-        fp.price_id
+        fp.price_id,
+        EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 as hours_old
       FROM flight_schedules fs
       INNER JOIN airlines al ON fs.airline_id = al.airline_id
       INNER JOIN airports dep ON fs.departure_airport_id = dep.airport_id
@@ -124,7 +125,8 @@ exports.searchFlights = async (req, res) => {
         price: parseFloat(row.price),
         currency: row.currency,
         flightDate: row.flight_date,
-        lastChecked: row.checked_at
+        lastChecked: row.checked_at,
+        hoursOld: parseFloat(row.hours_old)
       });
     });
 
@@ -137,11 +139,37 @@ exports.searchFlights = async (req, res) => {
       return minPriceA - minPriceB;
     });
 
+   
+    const STALE_THRESHOLD_HOURS = 6;
+    let oldestDataAge = 0;
+    let isStale = false;
+
+    if (flights.length > 0) {
+      // Find the oldest data
+      flights.forEach(flight => {
+        flight.classes.forEach(cls => {
+          if (cls.hoursOld > oldestDataAge) {
+            oldestDataAge = cls.hoursOld;
+          }
+        });
+      });
+      
+      isStale = oldestDataAge > STALE_THRESHOLD_HOURS;
+    }
+
     res.json({
       success: true,
       data: {
         flights,
         count: flights.length,
+        dataFreshness: {
+          oldestDataHours: Math.round(oldestDataAge * 10) / 10,
+          isStale: isStale,
+          thresholdHours: STALE_THRESHOLD_HOURS,
+          message: isStale 
+            ? `Price data is ${Math.round(oldestDataAge)} hours old. Consider refreshing for latest prices.`
+            : 'Price data is up to date'
+        },
         searchParams: {
           from,
           to,
@@ -275,4 +303,115 @@ function formatDuration(minutes) {
   const mins = minutes % 60;
   return `${hours}h ${mins}m`;
 }
+
+
+exports.getPopularDestinations = async (req, res) => {
+  try {
+    const { from } = req.query;
+    console.log(`Fetching popular destinations from: ${from}`);
+
+    if (!from) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required parameter: from'
+      });
+    }
+
+    // Get the departure airport ID
+    const airportQuery = `
+      SELECT airport_id, airport_name, city 
+      FROM airports 
+      WHERE airport_code = $1
+    `;
+    const airportResult = await db.query(airportQuery, [from]);
+    console.log(`✈️ Found airport: ${airportResult.rows.length > 0 ? airportResult.rows[0].airport_name : 'Not found'}`);
+
+    if (airportResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Departure airport not found'
+      });
+    }
+
+    const depAirportId = airportResult.rows[0].airport_id;
+    const depAirportName = airportResult.rows[0].airport_name;
+    const depCity = airportResult.rows[0].city;
+
+    // Get popular destinations with minimum prices
+    // Try to get future flights first, if none exist, get most recent data
+    let destinationsQuery = `
+      SELECT 
+        arr.airport_code,
+        arr.airport_name,
+        arr.city,
+        COUNT(DISTINCT fs.schedule_id) as flight_count,
+        MIN(fp.price) as min_price,
+        MAX(fp.currency) as currency
+      FROM flight_schedules fs
+      INNER JOIN airports arr ON fs.arrival_airport_id = arr.airport_id
+      INNER JOIN flight_prices fp ON fs.schedule_id = fp.schedule_id
+      WHERE fs.departure_airport_id = $1
+        AND fs.is_active = true
+        AND fp.flight_date >= CURRENT_DATE
+      GROUP BY arr.airport_code, arr.airport_name, arr.city
+      ORDER BY flight_count DESC, min_price ASC
+      LIMIT 8
+    `;
+
+    let destinationsResult = await db.query(destinationsQuery, [depAirportId]);
+
+    // If no future flights found, get the most recent available data
+    if (destinationsResult.rows.length === 0) {
+      destinationsQuery = `
+        SELECT 
+          arr.airport_code,
+          arr.airport_name,
+          arr.city,
+          COUNT(DISTINCT fs.schedule_id) as flight_count,
+          MIN(fp.price) as min_price,
+          MAX(fp.currency) as currency
+        FROM flight_schedules fs
+        INNER JOIN airports arr ON fs.arrival_airport_id = arr.airport_id
+        INNER JOIN flight_prices fp ON fs.schedule_id = fp.schedule_id
+        WHERE fs.departure_airport_id = $1
+          AND fs.is_active = true
+        GROUP BY arr.airport_code, arr.airport_name, arr.city
+        ORDER BY flight_count DESC, min_price ASC
+        LIMIT 8
+      `;
+      destinationsResult = await db.query(destinationsQuery, [depAirportId]);
+    }
+
+    const destinations = destinationsResult.rows.map(row => ({
+      airportCode: row.airport_code,
+      airportName: row.airport_name,
+      city: row.city,
+      flightCount: parseInt(row.flight_count),
+      minPrice: parseFloat(row.min_price),
+      currency: row.currency || 'VND'
+    }));
+
+    console.log(`✅ Found ${destinations.length} popular destinations`);
+
+    res.json({
+      success: true,
+      data: {
+        from: {
+          airportCode: from,
+          airportName: depAirportName,
+          city: depCity
+        },
+        destinations
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching popular destinations:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching popular destinations',
+      error: error.message
+    });
+  }
+};
 

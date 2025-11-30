@@ -12,7 +12,7 @@
   top: 100%;
   left: 0;
   right: 0;
-  z-index: 1000;
+  z-index: 9999;
   margin: 4px 0 0 0;
   padding: 0;
   list-style: none;
@@ -116,6 +116,7 @@
 /* Scrollbar styling */
 .suggestions-list::-webkit-scrollbar {
   width: 8px;
+  z-index: 10px;
 }
 
 .suggestions-list::-webkit-scrollbar-track {

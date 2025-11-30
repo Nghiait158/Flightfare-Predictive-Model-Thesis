@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import './header.css';
 
 const Header = () => {
@@ -18,7 +19,7 @@ const Header = () => {
   return (
     <nav className={`header-nav ${scrolled ? 'scrolled' : ''}`}>
       <div className="header-container">
-        <div className="header-logo">
+        <Link to="/" className="header-logo">
           {/* <div className="logo-icon-wrapper">
             <svg 
               className="plane-icon" 
@@ -33,7 +34,7 @@ const Header = () => {
             </svg>
           </div> */}
           <span className="logo-text">FareHunt - Predict. Plan. Fly.</span>
-        </div>
+        </Link>
 
         <div className="header-menu">
           <a href="#features" className="menu-link">

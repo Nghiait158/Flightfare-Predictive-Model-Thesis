@@ -14,7 +14,12 @@ router.get('/classes', flightController.getFlightClasses);
 // Get price history
 router.get('/price-history', flightController.getPriceHistory);
 
+// Get popular destinations
+router.get('/popular-destinations', flightController.getPopularDestinations);
+
 module.exports = router;
+
+
 
 
 

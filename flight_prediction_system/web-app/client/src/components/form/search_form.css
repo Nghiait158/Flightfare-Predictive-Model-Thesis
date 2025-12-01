@@ -9,6 +9,19 @@
               0 10px 10px -5px rgba(0, 0, 0, 0.04);
   position: relative;
   z-index: 10;
+  transition: all 0.4s ease;
+}
+
+.search-form-container.compact-mode {
+  padding: 20px 24px;
+  border-radius: 12px;
+}
+
+.compact-form-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  width: 100%;
 }
 
 /* Special styling for edit form inside modal */
@@ -90,6 +103,21 @@
   border-radius: 12px;
   width: fit-content;
   height: fit-content;
+}
+
+.passenger-selector.compact {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+}
+
+.passenger-selector.compact .passenger-button {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 11px 16px;
+  height: 44px;
 }
 
 .passenger-button {
@@ -251,6 +279,26 @@
   grid-template-columns: 1fr;
   gap: 16px;
   margin-bottom: 24px;
+  transition: all 0.4s ease;
+}
+
+.search-form-grid.horizontal-layout {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  margin-bottom: 0;
+  align-items: flex-end;
+  flex: 1;
+}
+
+.search-form-grid.horizontal-layout .form-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-form-grid.horizontal-layout .form-field.passenger-field {
+  flex: 0.9;
+  min-width: 140px;
 }
 
 .form-field {
@@ -265,6 +313,24 @@
   color: #e2e8f0;
   margin-bottom: 8px;
   padding-left: 8px;
+  white-space: nowrap;
+}
+
+.search-form-grid.horizontal-layout .form-label {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.compact-mode .input-field {
+  height: 44px;
+  padding: 11px 16px;
+  font-size: 15px;
+}
+
+.compact-mode .airport-input .input-field {
+  height: 44px;
+  padding: 11px 16px;
+  font-size: 15px;
 }
 
 .search-submit-btn {
@@ -280,9 +346,18 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  
   cursor: pointer;
   transition: all 0.3s ease;
+}
+
+.search-submit-btn.compact {
+  width: auto;
+  padding: 0 28px;
+  flex-shrink: 0;
+  height: 44px;
+  font-size: 16px;
+  white-space: nowrap;
+  min-width: 140px;
 }
 
 .search-submit-btn:hover {
@@ -306,5 +381,27 @@
 @media (min-width: 1024px) {
   .search-form-grid {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Responsive handling for compact mode */
+@media (max-width: 1200px) {
+  .compact-form-wrapper {
+    flex-wrap: wrap;
+  }
+  
+  .search-submit-btn.compact {
+    width: 100%;
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 900px) {
+  .search-form-grid.horizontal-layout {
+    flex-wrap: wrap;
+  }
+  
+  .search-form-grid.horizontal-layout .form-field {
+    min-width: calc(50% - 6px);
   }
 }

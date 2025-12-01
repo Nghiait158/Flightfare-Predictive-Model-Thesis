@@ -68,6 +68,16 @@ const flightService = {
       throw error;
     }
   },
+
+  getCheapestTickets: async (params) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/flights/cheapest`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching cheapest tickets:', error);
+      throw error;
+    }
+  },
 };
 
 export default flightService;

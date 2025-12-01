@@ -215,6 +215,156 @@ exports.getAirlines = async (req, res) => {
 };
 
 /**
+ * Get cheapest tickets for a route (Global minimum search)
+ * Scans future dates to find absolute cheapest prices
+ */
+exports.getCheapestTickets = async (req, res) => {
+  try {
+    const { from, to, daysAhead = 90, limit = 10 } = req.query;
+    
+    console.log('getCheapestTickets called with:', { from, to, daysAhead, limit });
+
+    // Validate required fields
+    if (!from || !to) {
+      console.warn('Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: from, to'
+      });
+    }
+
+    // Get airport IDs
+    const airportQuery = `
+      SELECT 
+        (SELECT airport_id FROM airports WHERE airport_code = $1) as dep_id,
+        (SELECT airport_id FROM airports WHERE airport_code = $2) as arr_id
+    `;
+    const airportResult = await db.query(airportQuery, [from, to]);
+    console.log('Airport IDs:', airportResult.rows[0]);
+
+    if (!airportResult.rows[0].dep_id || !airportResult.rows[0].arr_id) {
+      return res.status(404).json({
+        success: false,
+        message: 'Airports not found'
+      });
+    }
+
+    const { dep_id, arr_id } = airportResult.rows[0];
+
+    // Query to find cheapest flights across available dates
+    // Priority: 1. Lowest price, 2. Earliest date, 3. Direct flights
+    // Note: Searches all available dates in DB, not limited by current date
+    const cheapestQuery = `
+      SELECT DISTINCT ON (fp.flight_date, fs.schedule_id)
+        fs.schedule_id,
+        fs.departure_time,
+        fs.arrival_airport_id,
+        fs.duration_minutes,
+        al.airline_code,
+        al.airline_name,
+        fp.price,
+        fp.currency,
+        fp.flight_date,
+        fp.checked_at,
+        EXTRACT(DOW FROM fp.flight_date) as day_of_week,
+        TO_CHAR(fp.flight_date, 'Dy, Mon DD') as formatted_date
+      FROM flight_prices fp
+      INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
+      INNER JOIN airlines al ON fs.airline_id = al.airline_id
+      WHERE fs.departure_airport_id = $1
+        AND fs.arrival_airport_id = $2
+        AND fs.is_active = true
+        AND al.is_active = true
+      ORDER BY fp.flight_date, fs.schedule_id, fp.checked_at DESC
+    `;
+
+    const result = await db.query(cheapestQuery, [dep_id, arr_id]);
+    console.log(`Found ${result.rows.length} flight records from database`);
+
+    // Group by date and find minimum price for each date
+    const dateMinPrices = new Map();
+    
+    result.rows.forEach(row => {
+      const dateKey = row.flight_date.toISOString().split('T')[0];
+      if (!dateMinPrices.has(dateKey) || row.price < dateMinPrices.get(dateKey).price) {
+        dateMinPrices.set(dateKey, row);
+      }
+    });
+
+    // Sort by price (ascending), then by date (ascending)
+    const cheapestFlights = Array.from(dateMinPrices.values())
+      .sort((a, b) => {
+        if (a.price !== b.price) {
+          return a.price - b.price; // Lowest price first
+        }
+        return new Date(a.flight_date) - new Date(b.flight_date); // Earliest date first
+      })
+      .slice(0, limit)
+      .map(flight => {
+        // Calculate arrival time
+        const depTime = flight.departure_time;
+        const [hours, minutes] = depTime.split(':');
+        const depDate = new Date();
+        depDate.setHours(parseInt(hours), parseInt(minutes), 0);
+        
+        const arrDate = new Date(depDate.getTime() + flight.duration_minutes * 60000);
+        
+        // Format times
+        const formatTime = (date) => {
+          const h = date.getHours();
+          const m = date.getMinutes();
+          const ampm = h >= 12 ? 'pm' : 'am';
+          const h12 = h % 12 || 12;
+          return `${h12}:${m.toString().padStart(2, '0')}${ampm}`;
+        };
+
+        const durationHours = Math.floor(flight.duration_minutes / 60);
+        const durationMins = flight.duration_minutes % 60;
+        const durationStr = durationHours > 0 
+          ? `${durationHours}h${durationMins > 0 ? ` ${durationMins}m` : ''}`
+          : `${durationMins}m`;
+
+        return {
+          scheduleId: flight.schedule_id,
+          price: parseFloat(flight.price),
+          currency: flight.currency,
+          date: flight.formatted_date,
+          flightDate: flight.flight_date,
+          time: `${formatTime(depDate)} — ${formatTime(arrDate)}`,
+          duration: durationStr,
+          flightType: 'Direct',
+          airlineCode: flight.airline_code,
+          airlineName: flight.airline_name
+        };
+      });
+
+    console.log(`Returning ${cheapestFlights.length} cheapest flights`);
+
+    res.json({
+      success: true,
+      data: {
+        flights: cheapestFlights,
+        count: cheapestFlights.length,
+        searchParams: {
+          from,
+          to,
+          daysAhead
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching cheapest tickets:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching cheapest tickets',
+      error: error.message
+    });
+  }
+};
+
+/**
  * Get all flight classes
  */
 exports.getFlightClasses = async (req, res) => {
@@ -324,7 +474,7 @@ exports.getPopularDestinations = async (req, res) => {
       WHERE airport_code = $1
     `;
     const airportResult = await db.query(airportQuery, [from]);
-    console.log(`✈️ Found airport: ${airportResult.rows.length > 0 ? airportResult.rows[0].airport_name : 'Not found'}`);
+    console.log(`Found airport: ${airportResult.rows.length > 0 ? airportResult.rows[0].airport_name : 'Not found'}`);
 
     if (airportResult.rows.length === 0) {
       return res.status(404).json({

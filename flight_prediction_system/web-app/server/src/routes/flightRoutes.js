@@ -5,6 +5,9 @@ const flightController = require('../controllers/flightController');
 // Search flights
 router.post('/search', flightController.searchFlights);
 
+// Get cheapest tickets (global minimum search)
+router.get('/cheapest', flightController.getCheapestTickets);
+
 // Get airlines
 router.get('/airlines', flightController.getAirlines);
 

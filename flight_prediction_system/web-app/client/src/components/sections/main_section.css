@@ -140,25 +140,6 @@
   max-width: 100%;
 }
 
-.compact-options-wrapper {
-  margin-top: 24px;
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
-  animation: fadeInUp 0.5s ease;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 @media (min-width: 640px) {
   .main-container {
     padding-left: 24px;
@@ -180,13 +161,6 @@
   
   .main-title {
     font-size: 72px;
-  }
-}
-
-@media (max-width: 1400px) {
-  .compact-options-wrapper {
-    flex-direction: column;
-    gap: 16px;
   }
 }
 

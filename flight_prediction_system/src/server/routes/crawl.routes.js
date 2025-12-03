@@ -25,11 +25,6 @@ const router = express.Router();
 // Constants
 const MAX_RETRIES = 3;
 
-/**
- * Parse date from DDMMYYYY format to Date object
- * @param {string} dateStr - Date string in DDMMYYYY format (e.g., "17112025")
- * @returns {Date} Date object
- */
 function parseDateFromFormat(dateStr) {
     if (!dateStr || dateStr.length !== 8) {
         throw new Error(`Invalid date format: ${dateStr}. Expected DDMMYYYY format`);
@@ -40,11 +35,7 @@ function parseDateFromFormat(dateStr) {
     return new Date(year, month, day);
 }
 
-/**
- * Format Date object to DDMMYYYY format
- * @param {Date} date - Date object
- * @returns {string} Date string in DDMMYYYY format
- */
+
 function formatDateToString(date) {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -52,12 +43,6 @@ function formatDateToString(date) {
     return `${day}${month}${year}`;
 }
 
-/**
- * Generate list of dates from start date for specified number of days
- * @param {string} startDateStr - Start date in DDMMYYYY format
- * @param {number} days - Number of days to generate (including start date)
- * @returns {Array<string>} Array of date strings in DDMMYYYY format
- */
 function generateDateRange(startDateStr, days) {
     const startDate = parseDateFromFormat(startDateStr);
     const dates = [];
@@ -71,11 +56,6 @@ function generateDateRange(startDateStr, days) {
     return dates;
 }
 
-/**
- * Convert date from DDMMYYYY to DD/MM/YYYY format (for VietJet crawler)
- * @param {string} dateStr - Date string in DDMMYYYY format (e.g., "08122025")
- * @returns {string} Date string in DD/MM/YYYY format (e.g., "08/12/2025")
- */
 function convertToSlashFormat(dateStr) {
     if (!dateStr) return dateStr;
     
@@ -95,10 +75,6 @@ function convertToSlashFormat(dateStr) {
     throw new Error(`Invalid date format: ${dateStr}. Expected DDMMYYYY or DD/MM/YYYY`);
 }
 
-/**
- * POST /api/crawl/baydep
- * Crawl flight data from BayDep.vn
- */
 router.post('/baydep', async (req, res) => {
     const startTime = Date.now();
     let browser = null;
@@ -132,10 +108,8 @@ router.post('/baydep', async (req, res) => {
             auto_crawl_days = 0  // Number of days to auto-crawl (0 = only crawl the specified date)
         } = req.body;
         
-        // Debug: Log auto_crawl_days value
-        console.log(`🔍 DEBUG: auto_crawl_days received: ${auto_crawl_days} (type: ${typeof auto_crawl_days})`);
+        console.log(`DEBUG: auto_crawl_days received: ${auto_crawl_days} (type: ${typeof auto_crawl_days})`);
 
-        // Validate required parameters
         if (!departure_airport || !arrival_airport || !departure_date) {
             return res.status(400).json({
                 success: false,
@@ -191,13 +165,12 @@ router.post('/baydep', async (req, res) => {
             ? generateDateRange(departure_date, crawlDays + 1) // +1 to include start date
             : [departure_date];
         
-        console.log(`📅 Auto-crawl mode: ${crawlDays > 0 ? `Enabled (${datesToCrawl.length} days)` : 'Disabled'}`);
+        console.log(`Auto-crawl mode: ${crawlDays > 0 ? `Enabled (${datesToCrawl.length} days)` : 'Disabled'}`);
         if (crawlDays > 0) {
             console.log(`   Dates to crawl: ${datesToCrawl.join(', ')}`);
         }
-        console.log(`🔍 DEBUG: datesToCrawl array length: ${datesToCrawl.length}`);
+        console.log(`DEBUG: datesToCrawl array length: ${datesToCrawl.length}`);
         
-        // Update flight configuration with request parameters
         const updatedFlightConfig = {
             departure_airport: departure_airport.toUpperCase(),
             arrival_airport: arrival_airport.toUpperCase(),
@@ -213,7 +186,6 @@ router.post('/baydep', async (req, res) => {
             updated_at: new Date().toISOString() 
         };
 
-        // Save updated config to file
         await fs.promises.writeFile(
             FLIGHT_CONFIG_PATH, 
             JSON.stringify(updatedFlightConfig, null, 2), 
@@ -221,7 +193,7 @@ router.post('/baydep', async (req, res) => {
         );
         console.log(`Updated file config(content from body)`);
 
-        console.log(`✅ Flight configuration updated:`);
+        console.log(`   Flight configuration updated:`);
         console.log(`   • Route: ${updatedFlightConfig.departure_airport} → ${updatedFlightConfig.arrival_airport}`);
         console.log(`   • Trip type: ${updatedFlightConfig.search_options.trip_type}`);
         console.log(`   • Departure date: ${updatedFlightConfig.search_options.departure_date}`);
@@ -238,11 +210,10 @@ router.post('/baydep', async (req, res) => {
             try {
                 clearDirectory(SCREENSHOT_DIR);
             } catch (error) {
-                console.warn(`⚠️ Failed to clear screenshots directory: ${error.message}`);
+                console.warn(`Failed to clear screenshots directory: ${error.message}`);
             }
         }
 
-        // Load flight configuration and airports (base config)
         config = await loadFlightConfig();
         
         // Validate crawler configuration
@@ -251,33 +222,30 @@ router.post('/baydep', async (req, res) => {
             airports: config.airports
         });
 
-        // Launch browser once (will be reused for all dates)
         console.log('Launching browser...');
         const browserResult = await launchBrowser();
         browser = browserResult.browser;
         page = browserResult.page;
         
-        console.log('✅ Browser launched successfully');
+        console.log(' Browser launched successfully');
 
-        // Arrays to store results from all dates
         const allCrawlResults = [];
         const allStats = [];
         let overallSuccess = true;
         let totalExecutionTime = 0;
 
-        // Loop through each date
         for (let i = 0; i < datesToCrawl.length; i++) {
             const currentDate = datesToCrawl[i];
             const dateIndex = i + 1;
             const totalDates = datesToCrawl.length;
             
             console.log('\n' + '='.repeat(60));
-            console.log(`📅 Crawling date ${dateIndex}/${totalDates}: ${currentDate}`);
+            console.log(`Crawling date ${dateIndex}/${totalDates}: ${currentDate}`);
             console.log('='.repeat(60));
             
             // Verify browser and page are still valid before each crawl
             if (!browser || !page || browser.isConnected() === false) {
-                console.error('❌ Browser or page is no longer valid. Attempting to relaunch...');
+                console.error('Browser or page is no longer valid. Attempting to relaunch...');
                 try {
                     if (browser) {
                         await closeBrowser(browser).catch(() => {});
@@ -285,9 +253,9 @@ router.post('/baydep', async (req, res) => {
                     const browserResult = await launchBrowser();
                     browser = browserResult.browser;
                     page = browserResult.page;
-                    console.log('✅ Browser relaunched successfully');
+                    console.log('Browser relaunched successfully');
                 } catch (relaunchError) {
-                    console.error(`❌ Failed to relaunch browser: ${relaunchError.message}`);
+                    console.error(`Failed to relaunch browser: ${relaunchError.message}`);
                     overallSuccess = false;
                     allCrawlResults.push({
                         date: currentDate,
@@ -296,12 +264,11 @@ router.post('/baydep', async (req, res) => {
                         error: `Browser relaunch failed: ${relaunchError.message}`,
                         stats: null
                     });
-                    continue; // Skip this date and continue to next
+                    continue; 
                 }
             }
             
             try {
-                // Update flight config with current date
                 const dateSpecificConfig = {
                     ...updatedFlightConfig,
                     search_options: {
@@ -310,7 +277,6 @@ router.post('/baydep', async (req, res) => {
                     }
                 };
                 
-                // Save updated config to file
                 await fs.promises.writeFile(
                     FLIGHT_CONFIG_PATH, 
                     JSON.stringify(dateSpecificConfig, null, 2), 
@@ -341,10 +307,8 @@ router.post('/baydep', async (req, res) => {
                     });
                 }
                 
-                // Generate statistics for this date
                 const dateStats = baydepCrawler.getCrawlerStats(dateCrawlerResult);
                 
-                // Store results
                 allCrawlResults.push({
                     date: currentDate,
                     success: dateCrawlerResult.success,
@@ -358,14 +322,13 @@ router.post('/baydep', async (req, res) => {
                 
                 if (!dateCrawlerResult.success) {
                     overallSuccess = false;
-                    console.error(`❌ Failed to crawl date ${currentDate}: ${dateCrawlerResult.error || 'Unknown error'}`);
+                    console.error(`Failed to crawl date ${currentDate}: ${dateCrawlerResult.error || 'Unknown error'}`);
                 } else {
-                    console.log(`✅ Successfully crawled date ${currentDate}`);
+                    console.log(`Successfully crawled date ${currentDate}`);
                     
                     // Debug: Check conditions
-                    console.log(`🔍 DB Save Check - crawlDays: ${crawlDays}, hasResults: ${!!dateCrawlerResult.results}, hasDailyResults: ${!!(dateCrawlerResult.results && dateCrawlerResult.results.daily_results)}`);
+                    console.log(` DB Save Check - crawlDays: ${crawlDays}, hasResults: ${!!dateCrawlerResult.results}, hasDailyResults: ${!!(dateCrawlerResult.results && dateCrawlerResult.results.daily_results)}`);
                     
-                    // Save to database ONLY for user searches (not batch crawls)
                     if (crawlDays === 0 && dateCrawlerResult.results && dateCrawlerResult.results.daily_results) {
                         try {
                             console.log(`💾 User search detected - saving to database...`);
@@ -374,65 +337,55 @@ router.post('/baydep', async (req, res) => {
                                 dateSpecificConfig,
                                 'user_search'
                             );
-                            console.log(`✅ Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
+                            console.log(`Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
                         } catch (dbError) {
-                            console.error(`⚠️  Failed to save to database: ${dbError.message}`);
-                            console.error(`🔍 DB Error stack: ${dbError.stack}`);
-                            console.log(`📁 Data is still saved in JSON file as backup`);
+                            console.error(`Failed to save to database: ${dbError.message}`);
+                            console.error(` DB Error stack: ${dbError.stack}`);
+                            console.log(`Data is still saved in JSON file as backup`);
                             // Don't throw - continue execution even if DB fails
                         }
                     } else if (crawlDays > 0) {
-                        console.log(`📦 Batch crawl mode - data saved to file only (not database)`);
+                        console.log(`Batch crawl mode - data saved to file only (not database)`);
                     } else {
-                        console.log(`⚠️  DB save skipped - conditions not met`);
+                        console.log(`  DB save skipped - conditions not met`);
                     }
                 }
                 
-                // Reset page state for next crawl (important for multi-date crawling)
                 if (i < datesToCrawl.length - 1) {
                     try {
                         console.log('🔄 Resetting page state for next date...');
                         
-                        // Clear any existing navigation state and reset page
                         await page.evaluate(() => {
-                            // Stop any ongoing navigation
                             if (window.stop) {
                                 window.stop();
                             }
-                            // Clear any intervals or timeouts
                             const highestId = setTimeout(() => {}, 0);
                             for (let i = 0; i < highestId; i++) {
                                 clearTimeout(i);
                                 clearInterval(i);
                             }
                         }).catch(() => {
-                            // Ignore evaluation errors
                         });
                         
-                        // Navigate to blank page to reset state
                         await page.goto('about:blank', { 
                             waitUntil: 'domcontentloaded', 
                             timeout: 5000 
                         }).catch(() => {
-                            // Ignore navigation errors, continue anyway
                         });
                         
-                        // Small delay to ensure page is reset
                         await new Promise(resolve => setTimeout(resolve, 1000));
                         
-                        console.log('✅ Page state reset completed');
+                        console.log('Page state reset completed');
                     } catch (resetError) {
-                        console.warn(`⚠️ Page reset warning: ${resetError.message}`);
-                        // Continue to next date anyway
+                        console.warn(` Page reset warning: ${resetError.message}`);
                     }
                     
-                    // Additional delay between dates to avoid overwhelming the server
-                    console.log('⏳ Waiting 2 seconds before next date...');
+                    console.log('Waiting 2 seconds before next date...');
                     await new Promise(resolve => setTimeout(resolve, 2000));
                 }
                 
             } catch (error) {
-                console.error(`❌ Error crawling date ${currentDate}: ${error.message}`);
+                console.error(`Error crawling date ${currentDate}: ${error.message}`);
                 overallSuccess = false;
                 allCrawlResults.push({
                     date: currentDate,
@@ -444,7 +397,6 @@ router.post('/baydep', async (req, res) => {
             }
         }
 
-        // Aggregate results
         aggregatedResults = {
             total_dates: datesToCrawl.length,
             successful_dates: allCrawlResults.filter(r => r.success).length,
@@ -452,7 +404,6 @@ router.post('/baydep', async (req, res) => {
             dates: allCrawlResults
         };
 
-        // Use the last successful result's structure for compatibility
         crawlerResult = {
             success: overallSuccess,
             results: aggregatedResults,
@@ -460,7 +411,6 @@ router.post('/baydep', async (req, res) => {
             screenshots: allCrawlResults.flatMap(r => r.stats?.screenshotsTaken || [])
         };
 
-        // Generate overall statistics
         stats = {
             success: overallSuccess,
             executionTime: totalExecutionTime,
@@ -475,7 +425,6 @@ router.post('/baydep', async (req, res) => {
             successfulDates: aggregatedResults.successful_dates
         };
 
-        // Prepare API response
         const apiResponse = {
             success: crawlerResult.success,
             message: crawlDays > 0 
@@ -537,9 +486,9 @@ router.post('/baydep', async (req, res) => {
         return res.status(statusCode).json(apiResponse);
 
     } catch (error) {
-        console.error('\n❌ Critical error in API crawl request!');
-        console.error(`🔥 Error: ${error.message}`);
-        console.error(`📍 Stack trace: ${error.stack}`);
+        console.error('\nCritical error in API crawl request!');
+        console.error(`Error: ${error.message}`);
+        console.error(`Stack trace: ${error.stack}`);
 
         const errorResponse = {
             success: false,
@@ -559,36 +508,32 @@ router.post('/baydep', async (req, res) => {
             try {
                 await closeBrowser(browser);
             } catch (closeError) {
-                console.error(`⚠️ Error closing browser: ${closeError.message}`);
+                console.error(`Error closing browser: ${closeError.message}`);
             }
         }
 
         const finalDuration = ((Date.now() - startTime) / 1000).toFixed(2);
         
         if (crawlerResult && crawlerResult.success) {
-            console.log('\n🎉 API Crawl Request Completed Successfully!');
+            console.log('\nAPI Crawl Request Completed !');
             console.log('===========================================');
             if (crawlDays > 0 && aggregatedResults && datesToCrawl.length > 0) {
-                console.log(`📅 Auto-crawl: ${aggregatedResults.successful_dates}/${datesToCrawl.length} dates successful`);
+                console.log(`Auto-crawl: ${aggregatedResults.successful_dates}/${datesToCrawl.length} dates successful`);
                 console.log(`   Dates: ${datesToCrawl[0]} to ${datesToCrawl[datesToCrawl.length - 1]}`);
             }
-            console.log(`🕒 Runtime: ${finalDuration} seconds`);
-            console.log(`⏰ Completed at: ${new Date().toISOString()}`);
+            console.log(`Runtime: ${finalDuration} seconds`);
+            console.log(`Completed at: ${new Date().toISOString()}`);
         } else {
             const errorMsg = crawlerResult ? crawlerResult.error : "A critical error occurred before crawling could complete.";
-            console.error(`\n❌ Crawl FAILED. Error: ${errorMsg}`);
+            console.error(`\nCrawl FAILED. Error: ${errorMsg}`);
             if (crawlDays > 0 && aggregatedResults && datesToCrawl.length > 0) {
-                console.error(`📅 Auto-crawl: ${aggregatedResults.successful_dates}/${datesToCrawl.length} dates successful`);
+                console.error(`Auto-crawl: ${aggregatedResults.successful_dates}/${datesToCrawl.length} dates successful`);
             }
-            console.error(`🕒 Runtime: ${finalDuration} seconds`);
+            console.error(`Runtime: ${finalDuration} seconds`);
         }
     }
 });
 
-/**
- * GET /api/crawl/config
- * Get current flight configuration
- */
 router.get('/config', async (req, res) => {
     try {
         const configData = await fs.promises.readFile(FLIGHT_CONFIG_PATH, 'utf8');
@@ -608,10 +553,6 @@ router.get('/config', async (req, res) => {
     }
 });
 
-/**
- * POST /api/crawl/vietjet
- * Crawl flight data from VietJet Airlines
- */
 router.post('/vietjet', async (req, res) => {
     const startTime = Date.now();
     let browser = null;
@@ -619,7 +560,7 @@ router.post('/vietjet', async (req, res) => {
     let config = null;
 
     try {
-        console.log('🚀 API Crawl VietJet Request Started');
+        console.log('API Crawl VietJet Request Started');
         console.log('============================');
         console.log(`Started at: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}`);
         console.log(`Request body:`, JSON.stringify(req.body, null, 2));
@@ -639,7 +580,6 @@ router.post('/vietjet', async (req, res) => {
             clear_screenshots = true
         } = req.body;
 
-        // Validate required parameters
         if (!departure_airport || !arrival_airport || !departure_date) {
             return res.status(400).json({
                 success: false,
@@ -683,8 +623,6 @@ router.post('/vietjet', async (req, res) => {
             });
         }
 
-        // Update flight configuration with request parameters
-        // Convert dates to DD/MM/YYYY format for VietJet crawler
         const updatedFlightConfig = {
             departure_airport: departure_airport.toUpperCase(),
             arrival_airport: arrival_airport.toUpperCase(),
@@ -707,7 +645,7 @@ router.post('/vietjet', async (req, res) => {
             'utf8'
         );
 
-        console.log(`✅ Flight configuration updated:`);
+        console.log(` Flight configuration updated:`);
         console.log(`   • Route: ${updatedFlightConfig.departure_airport} → ${updatedFlightConfig.arrival_airport}`);
         console.log(`   • Trip type: ${updatedFlightConfig.search_options.trip_type}`);
         console.log(`   • Departure date: ${updatedFlightConfig.search_options.departure_date}`);
@@ -722,16 +660,15 @@ router.post('/vietjet', async (req, res) => {
         if (clear_screenshots) {
             try {
                 clearDirectory(SCREENSHOT_DIR);
-                console.log('📸 Screenshots directory cleared');
+                console.log(' Screenshots directory cleared');
             } catch (error) {
-                console.warn(`⚠️ Failed to clear screenshots directory: ${error.message}`);
+                console.warn(` Failed to clear screenshots directory: ${error.message}`);
             }
         }
 
-        // Load flight configuration and airports
         config = await loadFlightConfig();
         
-        console.log(`📋 Configuration loaded:`);
+        console.log(` Configuration loaded:`);
         console.log(`   • Route: ${config.flightConfig.departure_airport} → ${config.flightConfig.arrival_airport}`);
         console.log(`   • Departure: ${config.departureAirport.city} (${config.departureAirport.airport_name})`);
         console.log(`   • Arrival: ${config.arrivalAirport.city} (${config.arrivalAirport.airport_name})`);
@@ -743,15 +680,15 @@ router.post('/vietjet', async (req, res) => {
         });
 
         // Launch browser
-        console.log('🌐 Launching browser...');
+        console.log(' Launching browser...');
         const browserResult = await launchBrowser();
         browser = browserResult.browser;
         page = browserResult.page;
         
-        console.log('✅ Browser launched successfully');
+        console.log(' Browser launched successfully');
 
         // Run crawler
-        console.log('🔍 Starting crawler execution...');
+        console.log(' Starting crawler execution...');
         let crawlerResult;
 
         if (use_retry) {
@@ -777,7 +714,7 @@ router.post('/vietjet', async (req, res) => {
         const stats = vietjetCrawler.getCrawlerStats(crawlerResult);
         const totalDuration = Date.now() - startTime;
 
-        console.log('📊 Execution Statistics:');
+        console.log(' Execution Statistics:');
         console.log(`   • Success: ${stats.success ? '✅' : '❌'}`);
         console.log(`   • Route: ${stats.route}`);
         console.log(`   • Execution time: ${stats.executionTimeFormatted}`);
@@ -788,16 +725,16 @@ router.post('/vietjet', async (req, res) => {
         // Save to database for VietJet user searches
         if (crawlerResult.success && crawlerResult.results && crawlerResult.results.daily_results) {
             try {
-                console.log(`💾 Saving VietJet search results to database...`);
+                console.log(` Saving VietJet search results to database...`);
                 const dbResult = await saveFlightPricesToDB(
                     crawlerResult.results.daily_results,
                     updatedFlightConfig,
                     'user_search'
                 );
-                console.log(`✅ Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
+                console.log(` Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
             } catch (dbError) {
-                console.error(`⚠️  Failed to save to database: ${dbError.message}`);
-                console.log(`📁 Data is still saved in JSON file as backup`);
+                console.error(`  Failed to save to database: ${dbError.message}`);
+                console.log(` Data is still saved in JSON file as backup`);
                 // Don't throw - continue execution even if DB fails
             }
         }
@@ -852,11 +789,11 @@ router.post('/vietjet', async (req, res) => {
 
         // Log success message
         if (crawlerResult.success) {
-            console.log('\n🎉 API Crawl Request Completed Successfully!');
+            console.log('\n API Crawl Request Completed Successfully!');
             console.log('===========================================');
-            console.log(`⏱️ Total execution time: ${(totalDuration / 1000).toFixed(2)} seconds`);
-            console.log(`📸 Screenshots taken: ${crawlerResult.screenshots.length}`);
-            console.log(`📊 Results: ${crawlerResult.results ? 'Available' : 'None'}`);
+            console.log(`Total execution time: ${(totalDuration / 1000).toFixed(2)} seconds`);
+            console.log(` Screenshots taken: ${crawlerResult.screenshots.length}`);
+            console.log(` Results: ${crawlerResult.results ? 'Available' : 'None'}`);
         }
 
         // Return response
@@ -864,10 +801,10 @@ router.post('/vietjet', async (req, res) => {
         return res.status(statusCode).json(apiResponse);
 
     } catch (error) {
-        console.error('\n❌ Critical error in API crawl request!');
+        console.error('\n Critical error in API crawl request!');
         console.error('=======================================');
-        console.error(`🔥 Error: ${error.message}`);
-        console.error(`📍 Stack trace: ${error.stack}`);
+        console.error(` Error: ${error.message}`);
+        console.error(` Stack trace: ${error.stack}`);
 
         const errorResponse = {
             success: false,
@@ -883,30 +820,26 @@ router.post('/vietjet', async (req, res) => {
 
     } finally {
         // Cleanup - Always ensure browser is closed
-        console.log('\n🧹 Cleanup and resource management...');
+        console.log('\n Cleanup and resource management...');
         
         if (browser) {
             try {
                 await closeBrowser(browser);
-                console.log('✅ Browser closed successfully');
+                console.log(' Browser closed successfully');
             } catch (closeError) {
-                console.error(`⚠️ Error closing browser: ${closeError.message}`);
+                console.error(` Error closing browser: ${closeError.message}`);
             }
         }
 
         // Final summary
         const finalDuration = (Date.now() - startTime) / 1000;
-        console.log('\n📋 API Request Summary');
+        console.log('\nAPI Request Summary');
         console.log('=====================');
-        console.log(`🕒 Total runtime: ${finalDuration.toFixed(2)} seconds`);
-        console.log(`⏰ Completed at: ${new Date().toISOString()}`);
+        console.log(` Total runtime: ${finalDuration.toFixed(2)} seconds`);
+        console.log(` Completed at: ${new Date().toISOString()}`);
     }
 });
 
-/**
- * GET /api/crawl/health
- * Health check endpoint
- */
 router.get('/health', async (req, res) => {
     const dbAvailable = await isDatabaseAvailable();
     
@@ -922,10 +855,6 @@ router.get('/health', async (req, res) => {
     });
 });
 
-/**
- * GET /api/crawl/db-test
- * Test database connection and basic queries
- */
 router.get('/db-test', async (req, res) => {
     try {
         const dbAvailable = await isDatabaseAvailable();

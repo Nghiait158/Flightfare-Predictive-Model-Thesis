@@ -1,0 +1,431 @@
+.price-chart-container {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 
+              0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  flex: 1;
+  min-width: 0;
+  animation: slideInRight 0.4s ease;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Header Section */
+.price-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.price-chart-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Trip Type Toggle */
+.trip-type-toggle {
+  display: flex;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.trip-type-btn {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.trip-type-btn:hover {
+  color: #e2e8f0;
+}
+
+.trip-type-btn.active {
+  background: rgba(34, 211, 238, 0.15);
+  color: #22d3ee;
+  border: 1px solid rgba(34, 211, 238, 0.3);
+}
+
+/* Loading & Error States */
+.price-chart-loading,
+.price-chart-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 16px;
+}
+
+.price-chart-loading span,
+.price-chart-error span {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.price-chart-error span {
+  color: #f87171;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(34, 211, 238, 0.3);
+  border-top-color: #22d3ee;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* No Prices Message */
+.no-prices-message {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+  padding: 40px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+.no-prices-message p {
+  margin: 0;
+}
+
+/* Chart Content */
+.price-chart-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Price Range Info */
+.price-range-info {
+  display: flex;
+  gap: 16px;
+  justify-content: space-around;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.price-info-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.price-info-label {
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.price-info-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #22d3ee;
+}
+
+/* Bar Chart */
+.bar-chart-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 20px 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
+}
+
+.bar-chart-wrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.bar-chart-wrapper::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.bar-chart-wrapper::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.3);
+  border-radius: 3px;
+}
+
+.bar-chart {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  min-height: 280px;
+  padding: 0 8px;
+  min-width: max-content;
+}
+
+/* Bar Item */
+.bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 60px;
+}
+
+.bar-item:hover {
+  transform: translateY(-4px);
+}
+
+.bar-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 220px;
+  position: relative;
+}
+
+.bar-price-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2e8f0;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.bar-item:hover .bar-price-label,
+.bar-item.selected .bar-price-label {
+  opacity: 1;
+}
+
+.bar-fill {
+  width: 48px;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.8) 0%, rgba(34, 211, 238, 0.6) 100%);
+  border-radius: 8px 8px 4px 4px;
+  transition: all 0.3s ease;
+  position: relative;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  min-height: 40px;
+}
+
+.bar-item:hover .bar-fill {
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.9) 0%, rgba(59, 130, 246, 0.7) 100%);
+  border-color: rgba(34, 211, 238, 0.5);
+  box-shadow: 0 8px 16px rgba(34, 211, 238, 0.3);
+  transform: scaleY(1.05);
+}
+
+.bar-item.selected .bar-fill {
+  background: linear-gradient(180deg, #22d3ee 0%, #3b82f6 100%);
+  border-color: #22d3ee;
+  box-shadow: 0 12px 24px rgba(34, 211, 238, 0.4);
+}
+
+.bar-item.lowest .bar-fill {
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.8) 0%, rgba(16, 185, 129, 0.6) 100%);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+
+.bar-item.lowest:hover .bar-fill {
+  background: linear-gradient(180deg, rgba(34, 197, 94, 0.9) 0%, rgba(16, 185, 129, 0.7) 100%);
+  border-color: rgba(34, 197, 94, 0.6);
+  box-shadow: 0 8px 16px rgba(34, 197, 94, 0.3);
+}
+
+.best-deal-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  background: rgba(34, 197, 94, 0.9);
+  padding: 3px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Bar Labels */
+.bar-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.bar-date-day {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+}
+
+.bar-date-month {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.bar-date-weekday {
+  font-size: 10px;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.bar-item.selected .bar-date-day {
+  color: #22d3ee;
+}
+
+/* Select Date Button */
+.select-date-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, #22d3ee 0%, #3b82f6 100%);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(34, 211, 238, 0.3);
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.select-date-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(34, 211, 238, 0.4);
+}
+
+.select-date-btn:active {
+  transform: translateY(0);
+}
+
+/* Responsive Design */
+@media (max-width: 1400px) {
+  .price-chart-container {
+    min-width: 100%;
+    margin-top: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .price-chart-container {
+    padding: 20px;
+  }
+
+  .price-chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .price-chart-title {
+    font-size: 18px;
+  }
+
+  .trip-type-toggle {
+    width: 100%;
+  }
+
+  .trip-type-btn {
+    flex: 1;
+    padding: 10px 12px;
+  }
+
+  .price-range-info {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .bar-chart {
+    gap: 8px;
+    min-height: 240px;
+  }
+
+  .bar-column {
+    height: 180px;
+  }
+
+  .bar-fill {
+    width: 40px;
+  }
+
+  .bar-item {
+    min-width: 50px;
+  }
+
+  .bar-date-day {
+    font-size: 14px;
+  }
+
+  .bar-date-month {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .bar-chart {
+    gap: 6px;
+  }
+
+  .bar-fill {
+    width: 36px;
+  }
+
+  .bar-item {
+    min-width: 45px;
+  }
+
+  .price-info-value {
+    font-size: 16px;
+  }
+}

@@ -140,6 +140,77 @@
   max-width: 100%;
 }
 
+.compact-options-wrapper {
+  margin-top: 15px;
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+}
+
+.compact-options-wrapper > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.compact-right-column {
+  max-height: 800px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  scroll-behavior: smooth;
+  scroll-padding-top: 20px;
+}
+
+.compact-right-column::-webkit-scrollbar {
+  width: 8px;
+}
+
+.compact-right-column::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.compact-right-column::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.compact-right-column::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Section wrapper for scroll targets */
+.compact-right-column > div {
+  scroll-margin-top: 20px;
+  transition: transform 0.3s ease;
+}
+
+/* Subtle highlight animation when scrolling to section */
+@keyframes sectionHighlight {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .compact-options-wrapper {
+    flex-direction: column;
+  }
+  
+  .compact-right-column {
+    max-height: 400px;
+  }
+}
+
 @media (min-width: 640px) {
   .main-container {
     padding-left: 24px;

@@ -63,6 +63,17 @@
   transform: translateX(4px);
 }
 
+.flight-option-item.active {
+  background: rgba(34, 211, 238, 0.15);
+  border-color: rgba(34, 211, 238, 0.5);
+  border-width: 2px;
+}
+
+.flight-option-item.active .option-text {
+  color: #22d3ee;
+  font-weight: 600;
+}
+
 .option-icon {
   width: 40px;
   height: 40px;

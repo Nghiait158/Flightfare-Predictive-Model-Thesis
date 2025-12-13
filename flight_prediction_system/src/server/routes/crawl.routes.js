@@ -105,7 +105,8 @@ router.post('/baydep', async (req, res) => {
             find_cheapest = false,
             use_retry = true,
             clear_screenshots = true,
-            auto_crawl_days = 0  // Number of days to auto-crawl (0 = only crawl the specified date)
+            auto_crawl_days = 0,  // Number of days to auto-crawl (0 = only crawl the specified date)
+            save_in_db = false  // Save results to PostgreSQL database
         } = req.body;
         
         console.log(`DEBUG: auto_crawl_days received: ${auto_crawl_days} (type: ${typeof auto_crawl_days})`);
@@ -115,7 +116,7 @@ router.post('/baydep', async (req, res) => {
                 success: false,
                 error: 'Missing required parameters: departure_airport, arrival_airport, departure_date',
                 required_fields: ['departure_airport', 'arrival_airport', 'departure_date'],
-                optional_fields: ['return_date', 'trip_type', 'find_cheapest', 'use_retry', 'clear_screenshots']
+                optional_fields: ['return_date', 'trip_type', 'find_cheapest', 'use_retry', 'clear_screenshots', 'auto_crawl_days', 'save_in_db']
             });
         }
 
@@ -327,27 +328,29 @@ router.post('/baydep', async (req, res) => {
                     console.log(`Successfully crawled date ${currentDate}`);
                     
                     // Debug: Check conditions
-                    console.log(` DB Save Check - crawlDays: ${crawlDays}, hasResults: ${!!dateCrawlerResult.results}, hasDailyResults: ${!!(dateCrawlerResult.results && dateCrawlerResult.results.daily_results)}`);
+                    console.log(` DB Save Check - save_in_db: ${save_in_db}, crawlDays: ${crawlDays}, hasResults: ${!!dateCrawlerResult.results}, hasDailyResults: ${!!(dateCrawlerResult.results && dateCrawlerResult.results.daily_results)}`);
                     
-                    if (crawlDays === 0 && dateCrawlerResult.results && dateCrawlerResult.results.daily_results) {
+                    // Only save to database if save_in_db is true
+                    if (save_in_db && dateCrawlerResult.results && dateCrawlerResult.results.daily_results) {
                         try {
-                            console.log(`💾 User search detected - saving to database...`);
+                            const sourceType = crawlDays === 0 ? 'user_search' : 'batch_crawl';
+                            console.log(`💾 ${sourceType === 'user_search' ? 'User search' : 'Batch crawl'} - saving to database...`);
                             const dbResult = await saveFlightPricesToDB(
                                 dateCrawlerResult.results.daily_results,
                                 dateSpecificConfig,
-                                'user_search'
+                                sourceType
                             );
-                            console.log(`Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
+                            console.log(`✅ Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
                         } catch (dbError) {
-                            console.error(`Failed to save to database: ${dbError.message}`);
-                            console.error(` DB Error stack: ${dbError.stack}`);
-                            console.log(`Data is still saved in JSON file as backup`);
+                            console.error(`❌ Failed to save to database: ${dbError.message}`);
+                            console.error(`   DB Error stack: ${dbError.stack}`);
+                            console.log(`   Data is still saved in JSON file as backup`);
                             // Don't throw - continue execution even if DB fails
                         }
-                    } else if (crawlDays > 0) {
-                        console.log(`Batch crawl mode - data saved to file only (not database)`);
+                    } else if (!save_in_db) {
+                        console.log(`  DB save skipped - save_in_db is false`);
                     } else {
-                        console.log(`  DB save skipped - conditions not met`);
+                        console.log(`  DB save skipped - no results available`);
                     }
                 }
                 
@@ -577,7 +580,8 @@ router.post('/vietjet', async (req, res) => {
             trip_type = 'oneway',
             find_cheapest = false,
             use_retry = true,
-            clear_screenshots = true
+            clear_screenshots = true,
+            save_in_db = false  // Save results to PostgreSQL database
         } = req.body;
 
         if (!departure_airport || !arrival_airport || !departure_date) {
@@ -585,7 +589,7 @@ router.post('/vietjet', async (req, res) => {
                 success: false,
                 error: 'Missing required parameters: departure_airport, arrival_airport, departure_date',
                 required_fields: ['departure_airport', 'arrival_airport', 'departure_date'],
-                optional_fields: ['return_date', 'trip_type', 'find_cheapest', 'use_retry', 'clear_screenshots', 'adult', 'child', 'infant']
+                optional_fields: ['return_date', 'trip_type', 'find_cheapest', 'use_retry', 'clear_screenshots', 'adult', 'child', 'infant', 'save_in_db']
             });
         }
 
@@ -722,21 +726,23 @@ router.post('/vietjet', async (req, res) => {
         console.log(`   • Screenshots taken: ${stats.screenshotsTaken}`);
         console.log(`   • Results available: ${stats.hasResults ? '✅' : '❌'}`);
 
-        // Save to database for VietJet user searches
-        if (crawlerResult.success && crawlerResult.results && crawlerResult.results.daily_results) {
+        // Save to database for VietJet user searches (only if save_in_db is true)
+        if (save_in_db && crawlerResult.success && crawlerResult.results && crawlerResult.results.daily_results) {
             try {
-                console.log(` Saving VietJet search results to database...`);
+                console.log(`💾 Saving VietJet search results to database...`);
                 const dbResult = await saveFlightPricesToDB(
                     crawlerResult.results.daily_results,
                     updatedFlightConfig,
                     'user_search'
                 );
-                console.log(` Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
+                console.log(`✅ Database save: ${dbResult.savedCount}/${dbResult.total} records saved`);
             } catch (dbError) {
-                console.error(`  Failed to save to database: ${dbError.message}`);
-                console.log(` Data is still saved in JSON file as backup`);
+                console.error(`❌ Failed to save to database: ${dbError.message}`);
+                console.log(`   Data is still saved in JSON file as backup`);
                 // Don't throw - continue execution even if DB fails
             }
+        } else if (!save_in_db && crawlerResult.success) {
+            console.log(`  DB save skipped - save_in_db is false`);
         }
 
         // Prepare API response
@@ -850,7 +856,7 @@ router.get('/health', async (req, res) => {
         database: {
             available: dbAvailable,
             status: dbAvailable ? 'connected' : 'unavailable',
-            note: 'User searches saved to DB when available, batch crawls saved to file'
+            note: 'Set save_in_db=true to save crawl results to PostgreSQL database'
         }
     });
 });

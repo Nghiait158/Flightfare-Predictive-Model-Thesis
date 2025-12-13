@@ -1,10 +1,4 @@
-/**
- * @fileoverview Common constants for the flight crawler application
- */
 
-/**
- * Delay constants in milliseconds
- */
 // export const DELAY_SHORT = 500;
 // export const DELAY_MEDIUM = 1000;
 // export const DELAY_LONG = 2000;
@@ -15,20 +9,13 @@ export const DELAY_MEDIUM = 1;
 export const DELAY_LONG = 2;
 export const DELAY_EXTRA_LONG = 5;
 
-/**
- * Creates a delay with optional randomization to simulate human behavior
- * @param {number} ms - Base delay in milliseconds
- * @param {boolean} randomize - Whether to add random variation (default: true)
- * @returns {Promise<void>} Promise that resolves after the delay
- */
+
 export const delay = (ms, randomize = true) => {
     const variance = randomize ? Math.random() * 1000 : 0;
     return new Promise(resolve => setTimeout(resolve, ms + variance));
 };
 
-/**
- * Browser configuration constants
- */
+
 export const BROWSER_CONFIG = {
     HEADLESS: true,
     ARGS: [
@@ -47,20 +34,15 @@ export const BROWSER_CONFIG = {
     VIEWPORT_HEIGHT: 1080
 };
 
-/**
- * Timeout constants in milliseconds
- */
+
 export const TIMEOUTS = {
     DEFAULT: 30000,
-    NAVIGATION: 60000,
-    ELEMENT_WAIT: 10000,
-    NETWORK_IDLE: 5000,
-    SCRIPT_EXECUTION: 8000
+    NAVIGATION: 90000,  // Increased from 60s to 90s for slow websites like baydep.vn
+    ELEMENT_WAIT: 15000, // Increased from 10s to 15s
+    NETWORK_IDLE: 10000, // Increased from 5s to 10s
+    SCRIPT_EXECUTION: 15000 // Increased from 8s to 15s
 };
 
-/**
- * Console message filters for browser logging
- */
 export const CONSOLE_FILTERS = [
     'CORS',
     'Failed to load resource',
@@ -72,16 +54,11 @@ export const CONSOLE_FILTERS = [
     'cdn-media.vinbase.ai'
 ];
 
-/**
- * Application URLs
- */
 export const URLS = {
     VIETJET_INSURANCE: 'https://www.vietjetair.com/vi/pages/bao-hiem-du-lich-sky-care-1681121104781'
 };
 
-/**
- * Application modes
- */
+
 export const MODES = {
     PRODUCTION: 'production',
     DEVELOPMENT: 'development',

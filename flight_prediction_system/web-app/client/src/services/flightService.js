@@ -78,6 +78,16 @@ const flightService = {
       throw error;
     }
   },
+
+  getMonthlyPrices: async (params) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/flights/monthly-prices`, { params });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching monthly prices:', error);
+      throw error;
+    }
+  },
 };
 
 export default flightService;

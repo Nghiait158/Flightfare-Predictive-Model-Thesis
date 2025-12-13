@@ -78,7 +78,9 @@ exports.searchFlights = async (req, res) => {
       ORDER BY fs.schedule_id, c.class_id, fp.checked_at DESC
     `;
 
+    console.log(`Searching flights: dep_id=${dep_id}, arr_id=${arr_id}, departDate=${departDate}`);
     const flightResult = await db.query(flightQuery, [dep_id, arr_id, departDate]);
+    console.log(`Query returned ${flightResult.rows.length} flight-class combinations`);
 
     // Group flights by schedule and organize by class
     const flightsMap = new Map();
@@ -150,11 +152,13 @@ exports.searchFlights = async (req, res) => {
         flight.classes.forEach(cls => {
           if (cls.hoursOld > oldestDataAge) {
             oldestDataAge = cls.hoursOld;
+            console.log(`Found older data: ${cls.className} checked at ${cls.lastChecked} (${cls.hoursOld.toFixed(2)}h old)`);
           }
         });
       });
       
       isStale = oldestDataAge > STALE_THRESHOLD_HOURS;
+      console.log(`Data freshness: oldest=${oldestDataAge.toFixed(2)}h, isStale=${isStale}, threshold=${STALE_THRESHOLD_HOURS}h`);
     }
 
     res.json({
@@ -359,6 +363,108 @@ exports.getCheapestTickets = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching cheapest tickets',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get monthly prices - minimum price for each day in a month
+ */
+exports.getMonthlyPrices = async (req, res) => {
+  try {
+    const { from, to, year, month } = req.query;
+    
+    console.log('getMonthlyPrices called with:', { from, to, year, month });
+
+    // Validate required fields
+    if (!from || !to || !year || !month) {
+      console.warn('Missing required fields');
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: from, to, year, month'
+      });
+    }
+
+    // Get airport IDs
+    const airportQuery = `
+      SELECT 
+        (SELECT airport_id FROM airports WHERE airport_code = $1) as dep_id,
+        (SELECT airport_id FROM airports WHERE airport_code = $2) as arr_id
+    `;
+    const airportResult = await db.query(airportQuery, [from, to]);
+    console.log('Airport IDs:', airportResult.rows[0]);
+
+    if (!airportResult.rows[0].dep_id || !airportResult.rows[0].arr_id) {
+      return res.status(404).json({
+        success: false,
+        message: 'Airports not found'
+      });
+    }
+
+    const { dep_id, arr_id } = airportResult.rows[0];
+
+    // Calculate date range for the month
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDate = new Date(year, month, 0); // Last day of month
+    const endDateStr = `${year}-${String(month).padStart(2, '0')}-${endDate.getDate()}`;
+
+    console.log(`📅 Date range: ${startDate} to ${endDateStr}`);
+
+    // Query to find minimum price for each date in the month
+    // Use DISTINCT ON to get one row per date with the lowest price
+    const monthlyQuery = `
+      SELECT DISTINCT ON (fp.flight_date)
+        fp.flight_date,
+        MIN(fp.price) OVER (PARTITION BY fp.flight_date) as min_price,
+        FIRST_VALUE(fp.currency) OVER (PARTITION BY fp.flight_date ORDER BY fp.price) as currency,
+        TO_CHAR(fp.flight_date, 'YYYY-MM-DD') as date_string
+      FROM flight_prices fp
+      INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
+      INNER JOIN airlines al ON fs.airline_id = al.airline_id
+      WHERE fs.departure_airport_id = $1
+        AND fs.arrival_airport_id = $2
+        AND fp.flight_date >= $3::date
+        AND fp.flight_date <= $4::date
+        AND fs.is_active = true
+        AND al.is_active = true
+      ORDER BY fp.flight_date ASC
+    `;
+
+    const result = await db.query(monthlyQuery, [dep_id, arr_id, startDate, endDateStr]);
+    console.log(`✅ Found prices for ${result.rows.length} days in the month`);
+
+    if (result.rows.length === 0) {
+      console.log('⚠️ No flight prices found for this route/month');
+    }
+
+    const monthlyPrices = result.rows.map(row => ({
+      date: row.date_string,
+      minPrice: parseFloat(row.min_price),
+      currency: row.currency || 'VND'
+    }));
+
+    res.json({
+      success: true,
+      data: monthlyPrices,
+      searchParams: {
+        from,
+        to,
+        year: parseInt(year),
+        month: parseInt(month),
+        dateRange: {
+          start: startDate,
+          end: endDateStr
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching monthly prices:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching monthly prices',
       error: error.message
     });
   }

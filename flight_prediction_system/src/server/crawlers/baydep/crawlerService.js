@@ -52,13 +52,13 @@ export async function runCrawler(page, { flightConfig, airports }) {
         steps.push('Browser logging configured');
 
         // ----------------------------------------------------------------------------------------------------
-        //  Navigate to VietJet page
+        //  Navigate to BayDep page
         console.log('Navigating to target website...');
         
-        // go to VietNamAirlines Page
+        // go to BayDep Page with increased timeout for slow network
         await gotoPage(page, baydepcom_URL, {
             waitUntil: 'networkidle2',
-            timeout: 30000
+            timeout: 90000  // Increased from 30s to 90s for slow websites
         });
 
         // Validate page load

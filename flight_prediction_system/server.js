@@ -177,12 +177,12 @@ if (process.env.NODE_ENV !== 'production') {
 // Start server
 app.listen(PORT, () => {
     console.log('');
-    console.log('🚀 Flight Price Prediction System - Monolithic');
+    console.log('Flight Price Prediction System - Monolithic');
     console.log('===============================================');
-    console.log(`🌐 Server running on: http://localhost:${PORT}`);
-    console.log(`📊 Health check: http://localhost:${PORT}/health`);
-    console.log(`🔗 API Base: http://localhost:${PORT}/api`);
-    console.log(`⏰ Started at: ${new Date().toISOString()}`);
+    console.log(`Server running on: http://localhost:${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`API Base: http://localhost:${PORT}/api`);
+    console.log(`Started at: ${new Date().toISOString()}`);
     console.log('===============================================');
     console.log('');
     console.log('Available Endpoints:');

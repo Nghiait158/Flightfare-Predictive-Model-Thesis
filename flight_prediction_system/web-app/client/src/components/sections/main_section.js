@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import SearchForm from '../form/search_form';
 import PopularDestinations from './PopularDestinations';
 import FlightOptionsMenu from './FlightOptionsMenu';
 import CheapestTickets from './CheapestTickets';
+import PriceChart from './PriceChart';
 import { airports } from '../../data/airports';
 import './main_section.css';
 
 const MainSection = ({ onSearch }) => {
   const [selectedFrom, setSelectedFrom] = useState('');
   const [selectedTo, setSelectedTo] = useState('');
+  const [selectedOption, setSelectedOption] = useState('cheapest');
+  const [selectedDepartDate, setSelectedDepartDate] = useState('');
+  
+  // Refs for scrolling
+  const cheapestTicketsRef = useRef(null);
+  const priceChartRef = useRef(null);
 
   // Get city name from airport code
   const getCityName = (airportCode) => {
@@ -28,9 +35,38 @@ const MainSection = ({ onSearch }) => {
     setSelectedTo(airportCode);
   };
 
+  const handleSelectDate = (dateString) => {
+    console.log('Selected date:', dateString);
+    setSelectedDepartDate(dateString);
+  };
+
   const handleOptionSelect = (option) => {
     console.log('Selected option:', option);
-    // Handle option selection here
+    setSelectedOption(option);
+    
+    // Scroll to the selected section with a small delay for better UX
+    setTimeout(() => {
+      let targetRef = null;
+      
+      if (option === 'cheapest') {
+        targetRef = cheapestTicketsRef;
+      } else if (option === 'pricechart') {
+        targetRef = priceChartRef;
+      }
+      
+      if (targetRef && targetRef.current) {
+        // Get the parent scroll container
+        const scrollContainer = targetRef.current.closest('.compact-right-column');
+        
+        if (scrollContainer) {
+          const targetPosition = targetRef.current.offsetTop;
+          scrollContainer.scrollTo({
+            top: targetPosition - 20, // 20px offset from top
+            behavior: 'smooth'
+          });
+        }
+      }
+    }, 100);
   };
 
   // Check if both airports are selected
@@ -68,6 +104,7 @@ const MainSection = ({ onSearch }) => {
             onFromChange={handleFromChange}
             onToChange={handleToChange}
             selectedTo={selectedTo}
+            selectedDepartDate={selectedDepartDate}
             isCompactMode={isCompactMode}
           />
           
@@ -85,11 +122,26 @@ const MainSection = ({ onSearch }) => {
               fromAirport={getCityName(selectedFrom)}
               toAirport={getCityName(selectedTo)}
               onSelectOption={handleOptionSelect}
+              selectedOption={selectedOption}
             />
-            <CheapestTickets 
-              fromAirport={selectedFrom}
-              toAirport={selectedTo}
-            />
+            <div className="compact-right-column">
+              <div ref={cheapestTicketsRef}>
+                <CheapestTickets 
+                  fromAirport={selectedFrom}
+                  toAirport={selectedTo}
+                  onSelectDate={handleSelectDate}
+                />
+              </div>
+              
+              <div ref={priceChartRef}>
+                <PriceChart 
+                  fromAirport={selectedFrom}
+                  toAirport={selectedTo}
+                  onSelectDate={handleSelectDate}
+                />
+              </div>
+              
+            </div>
           </div>
         )}
       </div>

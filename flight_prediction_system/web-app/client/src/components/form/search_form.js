@@ -3,7 +3,7 @@ import Input from '../common/input';
 import AirportAutocomplete from '../common/airport_auto_complete';
 import './search_form.css';
 
-const SearchForm = ({ onSubmit, onFromChange, onToChange, selectedTo, isCompactMode }) => {
+const SearchForm = ({ onSubmit, onFromChange, onToChange, selectedTo, selectedDepartDate, isCompactMode }) => {
   const [formData, setFormData] = useState({
     from: '',
     to: '',
@@ -20,6 +20,16 @@ const SearchForm = ({ onSubmit, onFromChange, onToChange, selectedTo, isCompactM
       }));
     }
   }, [selectedTo]);
+
+  // Update 'departDate' when selectedDepartDate changes from PriceChart/CheapestTickets
+  useEffect(() => {
+    if (selectedDepartDate && selectedDepartDate !== formData.departDate) {
+      setFormData(prev => ({
+        ...prev,
+        departDate: selectedDepartDate
+      }));
+    }
+  }, [selectedDepartDate]);
   
   // In compact mode, always use roundtrip
   const [tripType, setTripType] = useState('one-way'); // 'return' or 'one-way'

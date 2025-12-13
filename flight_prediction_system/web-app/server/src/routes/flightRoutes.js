@@ -8,6 +8,9 @@ router.post('/search', flightController.searchFlights);
 // Get cheapest tickets (global minimum search)
 router.get('/cheapest', flightController.getCheapestTickets);
 
+// Get monthly prices (calendar view)
+router.get('/monthly-prices', flightController.getMonthlyPrices);
+
 // Get airlines
 router.get('/airlines', flightController.getAirlines);
 

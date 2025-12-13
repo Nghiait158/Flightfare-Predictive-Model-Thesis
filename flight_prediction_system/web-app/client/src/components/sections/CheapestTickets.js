@@ -1,17 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import flightService from '../../services/flightService';
 import './CheapestTickets.css';
 
-const CheapestTickets = ({ fromAirport, toAirport }) => {
+const CheapestTickets = ({ fromAirport, toAirport, onSelectDate }) => {
   const [cheapestFlights, setCheapestFlights] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => {
     if (fromAirport && toAirport) {
       fetchCheapestFlights();
     }
   }, [fromAirport, toAirport]);
+
+  useEffect(() => {
+    checkScrollButtons();
+  }, [cheapestFlights]);
 
   const fetchCheapestFlights = async () => {
     setIsLoading(true);
@@ -40,9 +47,46 @@ const CheapestTickets = ({ fromAirport, toAirport }) => {
     }
   };
 
+  const checkScrollButtons = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollLeft = container.scrollLeft;
+    const scrollWidth = container.scrollWidth;
+    const clientWidth = container.clientWidth;
+
+    setCanScrollLeft(scrollLeft > 0);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
+  };
+
+  const scrollToDirection = (direction) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const scrollAmount = 296; // width of one card (280px) + gap (16px)
+    const newScrollLeft = direction === 'left' 
+      ? container.scrollLeft - scrollAmount 
+      : container.scrollLeft + scrollAmount;
+
+    container.scrollTo({
+      left: newScrollLeft,
+      behavior: 'smooth'
+    });
+  };
+
   const handleFlightClick = (flight) => {
     console.log('Selected cheapest flight:', flight);
-    // TODO: Handle flight selection - navigate to search results with this date
+    if (onSelectDate && flight.flightDate) {
+      // Convert flightDate to YYYY-MM-DD format using local timezone
+      const date = new Date(flight.flightDate);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateString = `${year}-${month}-${day}`;
+      
+      onSelectDate(dateString);
+      console.log('Date selected from CheapestTickets:', dateString, 'Original:', flight.flightDate);
+    }
   };
 
   const formatPrice = (price, currency) => {
@@ -56,7 +100,9 @@ const CheapestTickets = ({ fromAirport, toAirport }) => {
   if (isLoading) {
     return (
       <div className="cheapest-tickets-container">
-        <h2 className="cheapest-tickets-title">Cheapest tickets</h2>
+        <div className="cheapest-tickets-header">
+          <h2 className="cheapest-tickets-title">Cheapest tickets</h2>
+        </div>
         <div className="cheapest-tickets-loading">
           <div className="loading-spinner"></div>
           <span>Finding best deals...</span>
@@ -68,7 +114,9 @@ const CheapestTickets = ({ fromAirport, toAirport }) => {
   if (error) {
     return (
       <div className="cheapest-tickets-container">
-        <h2 className="cheapest-tickets-title">Cheapest tickets</h2>
+        <div className="cheapest-tickets-header">
+          <h2 className="cheapest-tickets-title">Cheapest tickets</h2>
+        </div>
         <div className="cheapest-tickets-error">
           <span>{error}</span>
         </div>
@@ -79,7 +127,9 @@ const CheapestTickets = ({ fromAirport, toAirport }) => {
   if (cheapestFlights.length === 0) {
     return (
       <div className="cheapest-tickets-container">
-        <h2 className="cheapest-tickets-title">Cheapest tickets</h2>
+        <div className="cheapest-tickets-header">
+          <h2 className="cheapest-tickets-title">Cheapest tickets</h2>
+        </div>
         <div className="cheapest-tickets-empty">
           <span>No flights available for this route</span>
         </div>
@@ -89,9 +139,38 @@ const CheapestTickets = ({ fromAirport, toAirport }) => {
 
   return (
     <div className="cheapest-tickets-container">
-      <h2 className="cheapest-tickets-title">Cheapest tickets</h2>
+      <div className="cheapest-tickets-header">
+        <h2 className="cheapest-tickets-title">Cheapest tickets</h2>
+        
+        <div className="scroll-buttons">
+          <button 
+            className={`scroll-btn scroll-btn-left ${!canScrollLeft ? 'disabled' : ''}`}
+            onClick={() => scrollToDirection('left')}
+            disabled={!canScrollLeft}
+            aria-label="Scroll left"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6"/>
+            </svg>
+          </button>
+          <button 
+            className={`scroll-btn scroll-btn-right ${!canScrollRight ? 'disabled' : ''}`}
+            onClick={() => scrollToDirection('right')}
+            disabled={!canScrollRight}
+            aria-label="Scroll right"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </button>
+        </div>
+      </div>
       
-      <div className="cheapest-tickets-scroll">
+      <div 
+        className="cheapest-tickets-scroll"
+        ref={scrollContainerRef}
+        onScroll={checkScrollButtons}
+      >
         <div className="cheapest-tickets-list">
           {cheapestFlights.map((flight, index) => (
             <div 

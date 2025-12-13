@@ -436,7 +436,7 @@
 
 .flight-card__price {
   text-align: right;
-  background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+  background:  #06b6d4 ;
   padding: 12px 20px;
   border-radius: 10px;
 }

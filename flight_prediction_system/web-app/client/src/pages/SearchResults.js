@@ -62,19 +62,19 @@ const SearchResults = () => {
       setCrawling(true);
       setCrawlMessage('No flight prices found in database. Searching for latest prices...');
       
-      console.log('🚀 Starting automatic crawl...');
-      console.log('🔍 Search params:', searchParams);
-      console.log('🌐 Crawler URL:', process.env.REACT_APP_CRAWLER_URL || 'http://localhost:3000/api/crawl');
+      console.log('Starting automatic crawl...');
+      console.log('Search params:', searchParams);
+      console.log('Crawler URL:', process.env.REACT_APP_CRAWLER_URL || 'http://localhost:3000/api/crawl');
       
       // Crawl flight data
       const crawlResult = await crawlerService.smartCrawl(searchParams);
       
       if (crawlResult.success) {
-        console.log('✅ Crawl successful, fetching flights again...');
+        console.log('Crawl successful, fetching flights again...');
         setCrawlMessage('Flight prices found! Loading data...');
         
-        // Wait a bit for database to be updated
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Wait longer for database to be updated (increased from 2s to 5s)
+        await new Promise(resolve => setTimeout(resolve, 5000));
         
         // Will trigger re-fetch via return value
         return true;
@@ -82,7 +82,7 @@ const SearchResults = () => {
         throw new Error('Crawl failed');
       }
     } catch (err) {
-      console.error('❌ Crawl error:', err);
+      console.error('Crawl error:', err);
       
       // More user-friendly error with suggestions
       let errorMessage = 'Unable to search for new flight prices. ';
@@ -118,13 +118,14 @@ const SearchResults = () => {
       if (response.success) {
         // Store data freshness info
         if (response.data.dataFreshness) {
+          console.log('📊 Data Freshness:', response.data.dataFreshness);
           setDataFreshness(response.data.dataFreshness);
         }
 
         // Check if we got any flights
         if (response.data.flights.length === 0 && !skipCrawl) {
           // No flights found - trigger automatic crawl
-          console.log('⚠️ No flights found in database, triggering automatic crawl...');
+          console.log('No flights found in database, triggering automatic crawl...');
           const crawlSuccess = await crawlAndRetry();
           if (crawlSuccess) {
             // Recursively fetch again with skipCrawl = true
@@ -133,10 +134,35 @@ const SearchResults = () => {
           return; // Exit early if crawl failed
         }
 
-        // Check if data is stale and auto-refresh if needed
-        if (response.data.dataFreshness?.isStale && !skipCrawl && response.data.flights.length > 0) {
-          console.log('⚠️ Data is stale, suggesting refresh...');
-          // Don't auto-crawl for stale data, just show the data with refresh option
+        // Check if data is too old (> 6 hours) and auto-crawl
+        // But also check if we have just crawled (to avoid re-crawling immediately)
+        const AUTO_CRAWL_THRESHOLD = 6; // hours
+        
+        console.log(`🔍 Checking data freshness:`, {
+          oldestDataHours: response.data.dataFreshness?.oldestDataHours,
+          isStale: response.data.dataFreshness?.isStale,
+          threshold: AUTO_CRAWL_THRESHOLD,
+          skipCrawl: skipCrawl,
+          flightCount: response.data.flights.length
+        });
+        
+        if (response.data.dataFreshness?.oldestDataHours > AUTO_CRAWL_THRESHOLD && !skipCrawl && response.data.flights.length > 0) {
+          console.log(`⚠️ Data is too old (${response.data.dataFreshness.oldestDataHours}h > ${AUTO_CRAWL_THRESHOLD}h), triggering automatic crawl...`);
+          const crawlSuccess = await crawlAndRetry();
+          if (crawlSuccess) {
+            // Recursively fetch again with skipCrawl = true
+            return fetchFlights(true);
+          }
+          return; // Exit early if crawl failed
+        }
+
+        // Check if data is stale (0-6 hours) - just show the data with refresh option
+        if (response.data.dataFreshness?.isStale && response.data.dataFreshness?.oldestDataHours <= AUTO_CRAWL_THRESHOLD && !skipCrawl && response.data.flights.length > 0) {
+          console.log(`✅ Data is stale but within ${AUTO_CRAWL_THRESHOLD} hours, showing data with refresh option...`);
+        }
+        
+        if (response.data.dataFreshness?.oldestDataHours <= AUTO_CRAWL_THRESHOLD) {
+          console.log(`✅ Data is fresh (${response.data.dataFreshness?.oldestDataHours}h), showing results directly`);
         }
 
         setFlights(response.data.flights);
@@ -404,7 +430,7 @@ const SearchResults = () => {
             {crawling && (
               <div className="crawl-info">
                 <p className="crawl-info__note">
-                  ⏱️ This process may take 30-60 seconds
+                  This process may take 30-60 seconds
                 </p>
                 <p className="crawl-info__detail">
                   Collecting latest prices from airlines...
@@ -423,14 +449,14 @@ const SearchResults = () => {
         <Header />
         <div className="search-results">
         <div className="search-results__error">
-          <h2>❌ An Error Occurred</h2>
+          <h2>An Error Occurred</h2>
           <p>{error}</p>
           <div className="error-actions">
             <Button variant="secondary" onClick={() => {
               setError(null);
               fetchFlights(true); // Try again without crawl
             }}>
-              🔄 Try Again
+              Try Again
             </Button>
             <Button onClick={() => navigate('/')}>
               ← Back to Home
@@ -439,7 +465,7 @@ const SearchResults = () => {
           
           {/* Troubleshooting tips */}
           <div className="error-tips">
-            <h3>💡 Troubleshooting Tips:</h3>
+            <h3>Troubleshooting Tips:</h3>
             <ul>
               <li>Try searching with a different date</li>
               <li>Check your internet connection</li>
@@ -473,7 +499,7 @@ const SearchResults = () => {
               </span>
             </div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {dataFreshness && dataFreshness.isStale && (
+              {dataFreshness && dataFreshness.isStale && dataFreshness.oldestDataHours <= 6 && (
                 <span style={{ 
                   fontSize: '12px', 
                   color: '#fbbf24',
@@ -484,14 +510,14 @@ const SearchResults = () => {
                   ⚠️ Data is {Math.round(dataFreshness.oldestDataHours)}h old
                 </span>
               )}
-              {dataFreshness && dataFreshness.isStale && (
+              {dataFreshness && dataFreshness.isStale && dataFreshness.oldestDataHours <= 6 && (
                 <Button 
                   size="sm" 
                   variant="secondary" 
                   onClick={handleRefreshPrices}
                   disabled={crawling}
                 >
-                  🔄 Refresh Prices
+                  Refresh Prices
                 </Button>
               )}
               <Button size="sm" onClick={handleEditSearch}>
@@ -828,8 +854,8 @@ const SearchResults = () => {
                 <span className="summary-item__value">{filteredFlights.length}</span>
               </div>
               
-              {/* Data Freshness Info */}
-              {dataFreshness && (
+              {/* Data Freshness Info - Only show if data is 0-6 hours old */}
+              {dataFreshness && dataFreshness.oldestDataHours <= 6 && (
                 <>
                   <div className="summary-divider"></div>
                   <div className="summary-item">

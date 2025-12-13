@@ -45,27 +45,53 @@ export function readCSVFile(filePath) {
 }  
 
 // ----------------------------READ_JSON-------------------------------
-export function readJSONFile(filePath) {
-    try {
-        // console.log(`📖 Reading JSON file: ${path.basename(filePath)}`);
-        
-        if (!fs.existsSync(filePath)) {
-            throw new Error(`JSON file not found: ${filePath}`);
-        }
+// Retry logic to handle race conditions when file is being written
+export function readJSONFile(filePath, maxRetries = 3, retryDelay = 100) {
+    let lastError;
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            if (!fs.existsSync(filePath)) {
+                throw new Error(`JSON file not found: ${filePath}`);
+            }
 
-        const jsonContent = fs.readFileSync(filePath, 'utf-8');
-        const data = JSON.parse(jsonContent);
-        
-        console.log(`Read JSON file: ${path.basename(filePath)}`);
-        return data;
-        
-    } catch (error) {
-        console.error(`❌ Error reading JSON file ${filePath}:`, error.message);
-        throw new Error(`Failed to read JSON file: ${error.message}`);
+            const jsonContent = fs.readFileSync(filePath, 'utf-8');
+            
+            // Check if file content is empty or incomplete
+            if (!jsonContent || jsonContent.trim() === '') {
+                throw new Error('JSON file is empty');
+            }
+            
+            const data = JSON.parse(jsonContent);
+            
+            console.log(`Read JSON file: ${path.basename(filePath)}`);
+            return data;
+            
+        } catch (error) {
+            lastError = error;
+            
+            // If it's a JSON parse error, it might be due to race condition - retry
+            if (error.message.includes('JSON') || error.message.includes('empty')) {
+                if (attempt < maxRetries - 1) {
+                    console.warn(`⚠️ JSON read attempt ${attempt + 1} failed, retrying in ${retryDelay}ms...`);
+                    // Synchronous sleep for retry
+                    const start = Date.now();
+                    while (Date.now() - start < retryDelay) {
+                        // busy wait
+                    }
+                    continue;
+                }
+            }
+            
+            console.error(`❌ Error reading JSON file ${filePath}:`, error.message);
+            throw new Error(`Failed to read JSON file: ${error.message}`);
+        }
     }
+    
+    throw new Error(`Failed to read JSON file after ${maxRetries} attempts: ${lastError.message}`);
 }
 
-// --------WRITE_JSON
+// --------WRITE_JSON (with atomic write to prevent race conditions)
 export function writeJSONFile(data, filePath, pretty = true) {
     try {
         console.log(`Writing JSON file: ${path.basename(filePath)}`);
@@ -79,7 +105,11 @@ export function writeJSONFile(data, filePath, pretty = true) {
             console.log(`📁 Created directory: ${directory}`);
         }
         
-        fs.writeFileSync(filePath, jsonContent, 'utf-8');
+        // Atomic write: write to temp file first, then rename
+        const tempFilePath = `${filePath}.tmp.${Date.now()}`;
+        fs.writeFileSync(tempFilePath, jsonContent, 'utf-8');
+        fs.renameSync(tempFilePath, filePath);
+        
         console.log(`✅ Successfully wrote JSON file: ${path.basename(filePath)}`);
         
     } catch (error) {

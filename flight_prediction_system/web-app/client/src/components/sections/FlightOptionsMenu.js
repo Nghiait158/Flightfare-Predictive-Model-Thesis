@@ -1,7 +1,7 @@
 import React from 'react';
 import './FlightOptionsMenu.css';
 
-const FlightOptionsMenu = ({ fromAirport, toAirport, onSelectOption }) => {
+const FlightOptionsMenu = ({ fromAirport, toAirport, onSelectOption, selectedOption = 'cheapest' }) => {
   const handleOptionClick = (option) => {
     if (onSelectOption) {
       onSelectOption(option);
@@ -18,7 +18,7 @@ const FlightOptionsMenu = ({ fromAirport, toAirport, onSelectOption }) => {
       
       <div className="flight-options-list">
         <button 
-          className="flight-option-item"
+          className={`flight-option-item ${selectedOption === 'cheapest' ? 'active' : ''}`}
           onClick={() => handleOptionClick('cheapest')}
         >
           <div className="option-icon cheapest-icon">
@@ -30,7 +30,7 @@ const FlightOptionsMenu = ({ fromAirport, toAirport, onSelectOption }) => {
         </button>
 
         <button 
-          className="flight-option-item"
+          className={`flight-option-item ${selectedOption === 'pricechart' ? 'active' : ''}`}
           onClick={() => handleOptionClick('pricechart')}
         >
           <div className="option-icon chart-icon">
@@ -43,7 +43,7 @@ const FlightOptionsMenu = ({ fromAirport, toAirport, onSelectOption }) => {
         </button>
 
         <button 
-          className="flight-option-item"
+          className={`flight-option-item ${selectedOption === 'schedule' ? 'active' : ''}`}
           onClick={() => handleOptionClick('schedule')}
         >
           <div className="option-icon schedule-icon">

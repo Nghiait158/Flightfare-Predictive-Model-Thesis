@@ -25,7 +25,7 @@ const HomePage = () => {
       infants: formData.passengers?.infant || 0
     };
     
-    console.log('🔍 Transformed search params:', searchParams);
+    console.log('Transformed search params:', searchParams);
     
     // Navigate to search results page with search params
     navigate('/search-results', {

@@ -23,12 +23,64 @@
   }
 }
 
+.cheapest-tickets-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  position: relative;
+}
+
 .cheapest-tickets-title {
   font-size: 20px;
   font-weight: 700;
   color: white;
-  margin: 0 0 20px 0;
+  margin: 0;
   line-height: 1.4;
+}
+
+/* Scroll Navigation Buttons */
+.scroll-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.scroll-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  padding: 0;
+}
+
+.scroll-btn:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(34, 211, 238, 0.5);
+  transform: scale(1.05);
+}
+
+.scroll-btn:active:not(.disabled) {
+  transform: scale(0.95);
+}
+
+.scroll-btn.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.scroll-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 .cheapest-tickets-loading,
@@ -72,13 +124,16 @@
   overflow-x: auto;
   overflow-y: hidden;
   margin: 0 -8px;
-  padding: 0 8px;
-  scrollbar-width: thin;
+  padding: 8px 8px 0 8px;
+  scrollbar-width: none;
   scrollbar-color: rgba(34, 211, 238, 0.3) transparent;
 }
 
 .cheapest-tickets-scroll::-webkit-scrollbar {
-  height: 6px;
+  /* height: 6px; */
+  display: none; 
+  width: 0;
+  height: 0;
 }
 
 .cheapest-tickets-scroll::-webkit-scrollbar-track {
@@ -98,7 +153,7 @@
 .cheapest-tickets-list {
   display: flex;
   gap: 16px;
-  padding-bottom: 8px;
+  padding-bottom: 0px;
 }
 
 .cheapest-ticket-card {
@@ -110,6 +165,8 @@
   cursor: pointer;
   transition: all 0.3s ease;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .cheapest-ticket-card:hover {
@@ -117,6 +174,7 @@
   border-color: rgba(34, 211, 238, 0.5);
   transform: translateY(-4px);
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 10;
 }
 
 .ticket-price {
@@ -194,6 +252,16 @@
 
   .cheapest-tickets-title {
     font-size: 18px;
+  }
+
+  .scroll-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .scroll-btn svg {
+    width: 16px;
+    height: 16px;
   }
 
   .cheapest-ticket-card {

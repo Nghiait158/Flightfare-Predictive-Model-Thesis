@@ -1,28 +1,18 @@
 import axios from 'axios';
 
 // Note: Crawler runs on different port than backend API
-const CRAWLER_API_URL = process.env.REACT_APP_CRAWLER_URL || 'http://localhost:3000/api/crawl';
+// The crawler server (server.js) runs on port 3001 by default
+const CRAWLER_API_URL = process.env.REACT_APP_CRAWLER_URL || 'http://localhost:3001/api/crawl';
 
-/**
- * Crawler Service
- * Handles flight data crawling from various sources
- */
+
 const crawlerService = {
-  /**
-   * Convert date from YYYY-MM-DD to DDMMYYYY format
-   * @param {string} dateStr - Date in YYYY-MM-DD format
-   * @returns {string} Date in DDMMYYYY format
-   */
+
   convertDateFormat: (dateStr) => {
     const [year, month, day] = dateStr.split('-');
     return `${day}${month}${year}`;
   },
 
-  /**
-   * Crawl flights from BayDep
-   * @param {Object} params - Crawl parameters
-   * @returns {Promise} Crawl results
-   */
+
   crawlFromBayDep: async (params) => {
     try {
       const {
@@ -32,13 +22,16 @@ const crawlerService = {
         returnDate,
         adults = 1,
         children = 0,
-        infants = 0,
-        tripType = 'one-way'
+        infants = 0
       } = params;
 
       // Convert date format
       const formattedDepartDate = crawlerService.convertDateFormat(departDate);
       const formattedReturnDate = returnDate ? crawlerService.convertDateFormat(returnDate) : null;
+
+      // Determine trip type based on whether return date exists
+      // If returnDate is provided → roundtrip, otherwise → oneway
+      const actualTripType = formattedReturnDate ? 'roundtrip' : 'oneway';
 
       const payload = {
         departure_airport: from,
@@ -48,7 +41,7 @@ const crawlerService = {
         adult: adults,
         child: children,
         infant: infants,
-        trip_type: tripType === 'return' ? 'roundtrip' : 'oneway',
+        trip_type: actualTripType,
         use_retry: true,
         clear_screenshots: false,
         auto_crawl_days: 0 // Only crawl the specific date
@@ -57,7 +50,7 @@ const crawlerService = {
       console.log('🚀 Crawling from BayDep with params:', payload);
 
       const response = await axios.post(`${CRAWLER_API_URL}/baydep`, payload, {
-        timeout: 120000 // 2 minutes timeout for crawling
+        timeout: 300000 // 5 minutes timeout for crawling (crawl can take 2-3 minutes)
       });
 
       return response.data;
@@ -67,12 +60,6 @@ const crawlerService = {
     }
   },
 
-  /**
-   * Crawl flights from VietJet
-   * NOTE: Currently not used by smartCrawl. Available for direct calls if needed.
-   * @param {Object} params - Crawl parameters
-   * @returns {Promise} Crawl results
-   */
   crawlFromVietJet: async (params) => {
     try {
       const {
@@ -82,13 +69,16 @@ const crawlerService = {
         returnDate,
         adults = 1,
         children = 0,
-        infants = 0,
-        tripType = 'one-way'
+        infants = 0
       } = params;
 
       // Convert date format
       const formattedDepartDate = crawlerService.convertDateFormat(departDate);
       const formattedReturnDate = returnDate ? crawlerService.convertDateFormat(returnDate) : null;
+
+      // Determine trip type based on whether return date exists
+      // If returnDate is provided → roundtrip, otherwise → oneway
+      const actualTripType = formattedReturnDate ? 'roundtrip' : 'oneway';
 
       const payload = {
         departure_airport: from,
@@ -98,7 +88,7 @@ const crawlerService = {
         adult: adults,
         child: children,
         infant: infants,
-        trip_type: tripType === 'return' ? 'roundtrip' : 'oneway',
+        trip_type: actualTripType,
         use_retry: true,
         clear_screenshots: false
       };
@@ -106,7 +96,7 @@ const crawlerService = {
       console.log('🚀 Crawling from VietJet with params:', payload);
 
       const response = await axios.post(`${CRAWLER_API_URL}/vietjet`, payload, {
-        timeout: 120000 // 2 minutes timeout for crawling
+        timeout: 300000 // 5 minutes timeout for crawling (crawl can take 2-3 minutes)
       });
 
       return response.data;

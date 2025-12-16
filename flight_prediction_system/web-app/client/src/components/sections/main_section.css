@@ -104,10 +104,7 @@
 }
 
 .main-title-gradient {
-  background: linear-gradient(to right, #60a5fa, #22d3ee);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #60a5fa;
 }
 
 .main-description {
@@ -157,11 +154,6 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  scroll-behavior: smooth;
-  scroll-padding-top: 20px;
 }
 
 .compact-right-column::-webkit-scrollbar {
@@ -180,25 +172,6 @@
 
 .compact-right-column::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
-}
-
-/* Section wrapper for scroll targets */
-.compact-right-column > div {
-  scroll-margin-top: 20px;
-  transition: transform 0.3s ease;
-}
-
-/* Subtle highlight animation when scrolling to section */
-@keyframes sectionHighlight {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.01);
-  }
-  100% {
-    transform: scale(1);
-  }
 }
 
 @media (max-width: 768px) {

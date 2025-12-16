@@ -10,12 +10,13 @@ import './main_section.css';
 const MainSection = ({ onSearch }) => {
   const [selectedFrom, setSelectedFrom] = useState('');
   const [selectedTo, setSelectedTo] = useState('');
-  const [selectedOption, setSelectedOption] = useState('cheapest');
-  const [selectedDepartDate, setSelectedDepartDate] = useState('');
-  
-  // Refs for scrolling
+  const [selectedDate, setSelectedDate] = useState('');
+
+  // Refs for smooth scrolling
   const cheapestTicketsRef = useRef(null);
   const priceChartRef = useRef(null);
+  const searchFormRef = useRef(null);
+  const rightColumnRef = useRef(null);
 
   // Get city name from airport code
   const getCityName = (airportCode) => {
@@ -35,38 +36,57 @@ const MainSection = ({ onSearch }) => {
     setSelectedTo(airportCode);
   };
 
-  const handleSelectDate = (dateString) => {
-    console.log('Selected date:', dateString);
-    setSelectedDepartDate(dateString);
-  };
-
   const handleOptionSelect = (option) => {
     console.log('Selected option:', option);
-    setSelectedOption(option);
     
-    // Scroll to the selected section with a small delay for better UX
-    setTimeout(() => {
-      let targetRef = null;
+    // Smooth scroll within the right column container only
+    if (!rightColumnRef.current) return;
+
+    if (option === 'cheapest' && cheapestTicketsRef.current) {
+      const container = rightColumnRef.current;
+      const target = cheapestTicketsRef.current;
+      const targetPosition = target.offsetTop - container.offsetTop;
       
-      if (option === 'cheapest') {
-        targetRef = cheapestTicketsRef;
-      } else if (option === 'pricechart') {
-        targetRef = priceChartRef;
-      }
+      container.scrollTo({
+        top: targetPosition,
+        behavior: 'smooth'
+      });
+    } else if (option === 'pricechart' && priceChartRef.current) {
+      const container = rightColumnRef.current;
+      const target = priceChartRef.current;
+      const targetPosition = target.offsetTop - container.offsetTop;
       
-      if (targetRef && targetRef.current) {
-        // Get the parent scroll container
-        const scrollContainer = targetRef.current.closest('.compact-right-column');
-        
-        if (scrollContainer) {
-          const targetPosition = targetRef.current.offsetTop;
-          scrollContainer.scrollTo({
-            top: targetPosition - 20, // 20px offset from top
-            behavior: 'smooth'
-          });
-        }
-      }
-    }, 100);
+      container.scrollTo({
+        top: targetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const handlePriceChartDateSelect = (date) => {
+    console.log('Selected date from price chart:', date);
+    setSelectedDate(date);
+    
+    // Scroll to search form
+    if (searchFormRef.current) {
+      searchFormRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+  };
+
+  const handleCheapestTicketSelect = (date) => {
+    console.log('Selected date from cheapest ticket:', date);
+    setSelectedDate(date);
+    
+    // Scroll to search form
+    if (searchFormRef.current) {
+      searchFormRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
   };
 
   // Check if both airports are selected
@@ -98,13 +118,13 @@ const MainSection = ({ onSearch }) => {
           </p>
         </div>
 
-        <div className={`main-search ${isCompactMode ? 'compact' : ''}`}>
+        <div className={`main-search ${isCompactMode ? 'compact' : ''}`} ref={searchFormRef}>
           <SearchForm 
             onSubmit={onSearch}
             onFromChange={handleFromChange}
             onToChange={handleToChange}
             selectedTo={selectedTo}
-            selectedDepartDate={selectedDepartDate}
+            selectedDate={selectedDate}
             isCompactMode={isCompactMode}
           />
           
@@ -122,14 +142,13 @@ const MainSection = ({ onSearch }) => {
               fromAirport={getCityName(selectedFrom)}
               toAirport={getCityName(selectedTo)}
               onSelectOption={handleOptionSelect}
-              selectedOption={selectedOption}
             />
-            <div className="compact-right-column">
+            <div className="compact-right-column" ref={rightColumnRef}>
               <div ref={cheapestTicketsRef}>
                 <CheapestTickets 
                   fromAirport={selectedFrom}
                   toAirport={selectedTo}
-                  onSelectDate={handleSelectDate}
+                  onSelectFlight={handleCheapestTicketSelect}
                 />
               </div>
               
@@ -137,10 +156,9 @@ const MainSection = ({ onSearch }) => {
                 <PriceChart 
                   fromAirport={selectedFrom}
                   toAirport={selectedTo}
-                  onSelectDate={handleSelectDate}
+                  onSelectDate={handlePriceChartDateSelect}
                 />
               </div>
-              
             </div>
           </div>
         )}

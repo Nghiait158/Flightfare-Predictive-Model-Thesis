@@ -10,6 +10,7 @@
   flex: 1;
   min-width: 0;
   animation: slideInRight 0.4s ease;
+  scroll-margin-top: 100px;
 }
 
 @keyframes slideInRight {

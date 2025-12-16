@@ -46,6 +46,12 @@ const SearchResults = () => {
     ticketClass: []
   });
 
+  // Actual price range from flight data (for slider bounds)
+  const [actualPriceRange, setActualPriceRange] = useState({
+    min: 0,
+    max: 10000000
+  });
+
   const [sortBy, setSortBy] = useState('recommended');
   const [viewMode, setViewMode] = useState('list');
   const [showEditModal, setShowEditModal] = useState(false);
@@ -54,6 +60,8 @@ const SearchResults = () => {
   const [airlines, setAirlines] = useState([]);
   const [flightClasses, setFlightClasses] = useState([]);
   const [dataFreshness, setDataFreshness] = useState(null);
+  const [nearbyDatePrices, setNearbyDatePrices] = useState([]);
+  const [loadingNearbyPrices, setLoadingNearbyPrices] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -355,10 +363,22 @@ const SearchResults = () => {
   };
 
   const handlePriceChange = (minOrMax, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [minOrMax === 'min' ? 'priceMin' : 'priceMax']: value
-    }));
+    setFilters(prev => {
+      const newValue = parseInt(value);
+      
+      // Validate: min cannot be greater than max, and vice versa
+      if (minOrMax === 'min') {
+        return {
+          ...prev,
+          priceMin: Math.min(newValue, prev.priceMax - 100000) // Keep 100k gap minimum
+        };
+      } else {
+        return {
+          ...prev,
+          priceMax: Math.max(newValue, prev.priceMin + 100000) // Keep 100k gap minimum
+        };
+      }
+    });
     setCurrentPage(1);
   };
 
@@ -418,6 +438,125 @@ const SearchResults = () => {
       year: 'numeric'
     });
   };
+
+  const formatDateShort = (dateString) => {
+    const date = new Date(dateString);
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return {
+      day: days[date.getDay()],
+      date: date.getDate(),
+      month: months[date.getMonth()]
+    };
+  };
+
+  // Generate nearby dates (3 days before and 3 days after)
+  const generateNearbyDates = useMemo(() => {
+    const dates = [];
+    const currentDate = new Date(searchParams.departDate);
+    
+    for (let i = -3; i <= 3; i++) {
+      const date = new Date(currentDate);
+      date.setDate(currentDate.getDate() + i);
+      dates.push({
+        date: date.toISOString().split('T')[0],
+        isSelected: i === 0
+      });
+    }
+    
+    return dates;
+  }, [searchParams.departDate]);
+
+  // Fetch prices for nearby dates (only fresh data)
+  useEffect(() => {
+    const fetchNearbyPrices = async () => {
+      if (flights.length === 0 || generateNearbyDates.length === 0) {
+        setNearbyDatePrices([]);
+        setLoadingNearbyPrices(false);
+        return;
+      }
+
+      setLoadingNearbyPrices(true);
+
+      try {
+        // Get the current selected date price
+        const prices = flights.flatMap(f => f.classes.map(c => c.price));
+        const selectedDatePrice = prices.length > 0 ? Math.min(...prices) : null;
+
+        if (!selectedDatePrice) {
+          setNearbyDatePrices([]);
+          setLoadingNearbyPrices(false);
+          return;
+        }
+
+        // Get all dates except the selected one
+        const datesToFetch = generateNearbyDates
+          .filter(d => !d.isSelected)
+          .map(d => d.date);
+
+        // Fetch prices for nearby dates
+        const response = await flightService.getNearbyDatePrices(
+          searchParams.from,
+          searchParams.to,
+          datesToFetch
+        );
+
+        if (response.success) {
+          const pricesData = response.data.prices;
+          
+          // Map the data with price differences (only fresh data)
+          const pricesByDate = generateNearbyDates.map(dateInfo => {
+            if (dateInfo.isSelected) {
+              return {
+                ...dateInfo,
+                price: selectedDatePrice,
+                priceDiff: 0,
+                isFresh: true
+              };
+            }
+
+            const datePrice = pricesData[dateInfo.date];
+            
+            // Only include if data is fresh
+            if (datePrice && datePrice.isFresh) {
+              const diff = datePrice.minPrice - selectedDatePrice;
+              return {
+                ...dateInfo,
+                price: datePrice.minPrice,
+                priceDiff: diff,
+                isFresh: true,
+                hoursOld: datePrice.hoursOld
+              };
+            }
+
+            // Don't include stale data
+            return null;
+          }).filter(item => item !== null); // Remove null entries (stale data)
+
+          setNearbyDatePrices(pricesByDate);
+        }
+      } catch (error) {
+        console.error('Error fetching nearby date prices:', error);
+        // Fallback: show only selected date
+        const prices = flights.flatMap(f => f.classes.map(c => c.price));
+        const selectedDatePrice = prices.length > 0 ? Math.min(...prices) : null;
+        
+        if (selectedDatePrice) {
+          setNearbyDatePrices([{
+            date: searchParams.departDate,
+            isSelected: true,
+            price: selectedDatePrice,
+            priceDiff: 0,
+            isFresh: true
+          }]);
+        }
+      } finally {
+        setLoadingNearbyPrices(false);
+      }
+    };
+
+    fetchNearbyPrices();
+  }, [flights, generateNearbyDates, searchParams.from, searchParams.to, searchParams.departDate]);
 
   if (loading || crawling) {
     return (
@@ -484,7 +623,8 @@ const SearchResults = () => {
         {/* Header */}
         <div className="search-results__header">
           <div className="search-results__header-content">
-          <div className="search-info">
+            <div className="search-results__header-top">
+              <div className="search-info">
             <div className="search-info__details">
               <span className="search-info__route">
                 {searchParams.from} → {searchParams.to}
@@ -557,8 +697,78 @@ const SearchResults = () => {
               ]}
             />
           </div>
+            </div>
+
+            {/* Nearby Dates Price Selector */}
+            {(nearbyDatePrices.length > 0 || loadingNearbyPrices) && (
+              <div className="nearby-dates">
+                <div className="nearby-dates__label">
+                  <span className="nearby-dates__icon">📅</span>
+                  <span>Prices for nearby dates</span>
+                  {nearbyDatePrices.length === 1 && !loadingNearbyPrices && (
+                    <span className="nearby-dates__info">(Only fresh data shown)</span>
+                  )}
+                </div>
+                {loadingNearbyPrices ? (
+                  <div className="nearby-dates__loading">
+                    <div className="spinner-small"></div>
+                    <span>Loading prices...</span>
+                  </div>
+                ) : (
+                <div className="nearby-dates__list">
+                {nearbyDatePrices.map((dateInfo) => {
+                  const formatted = formatDateShort(dateInfo.date);
+                  const isSelected = dateInfo.isSelected;
+                  const priceDiff = dateInfo.priceDiff || 0;
+                  
+                  // Format price difference
+                  let priceDisplay = '';
+                  if (isSelected) {
+                    priceDisplay = formatPrice(dateInfo.price);
+                  } else if (Math.abs(priceDiff) < 10000) {
+                    // Less than 10k difference, consider it same price
+                    priceDisplay = '≈ Same';
+                  } else if (priceDiff > 0) {
+                    // Format without VND symbol for cleaner look
+                    const diffAmount = new Intl.NumberFormat('vi-VN').format(Math.abs(priceDiff));
+                    priceDisplay = `+${diffAmount}đ`;
+                  } else {
+                    const diffAmount = new Intl.NumberFormat('vi-VN').format(Math.abs(priceDiff));
+                    priceDisplay = `-${diffAmount}đ`;
+                  }
+                  
+                  return (
+                    <button
+                      key={dateInfo.date}
+                      className={`nearby-date-item ${isSelected ? 'nearby-date-item--selected' : ''} ${priceDiff < 0 ? 'nearby-date-item--cheaper' : ''} ${priceDiff > 0 ? 'nearby-date-item--expensive' : ''}`}
+                      onClick={() => {
+                        if (!isSelected) {
+                          const newParams = {
+                            ...searchParams,
+                            departDate: dateInfo.date
+                          };
+                          setSearchParams(newParams);
+                          setCurrentPage(1);
+                        }
+                      }}
+                      disabled={isSelected}
+                    >
+                      <div className="nearby-date-item__price">
+                        {priceDisplay}
+                      </div>
+                      <div className="nearby-date-item__day">{formatted.day}</div>
+                      <div className="nearby-date-item__date">
+                        {formatted.month} {formatted.date}
+                      </div>
+                    </button>
+                  );
+                })}
+                </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
 
       {/* Main Content */}
       <div className="search-results__content">
@@ -577,33 +787,65 @@ const SearchResults = () => {
               <span>{filteredFlights.length} flight{filteredFlights.length !== 1 ? 's' : ''}</span>
             </div>
 
-            {/* Price Range  */}
+            {/* Price Range - Dual Range Slider */}
             <div className="filter-group">
               <h3 className="filter-group__title">Price Range</h3>
               <div className="filter-group__content">
-                <div className="price-range">
-                  <div className="price-range__labels">
-                    <span>{formatPrice(filters.priceMin)}</span>
-                    <span>{formatPrice(filters.priceMax)}</span>
+                <div className="price-range-dual">
+                  {/* Price labels */}
+                  <div className="price-range-dual__labels">
+                    <span className="price-label price-label--min">
+                      {formatPrice(filters.priceMin)}
+                    </span>
+                    <span className="price-label price-label--max">
+                      {formatPrice(filters.priceMax)}
+                    </span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="10000000"
-                    step="100000"
-                    value={filters.priceMin}
-                    onChange={(e) => handlePriceChange('min', parseInt(e.target.value))}
-                    className="range-slider"
-                  />
-                  <input
-                    type="range"
-                    min="0"
-                    max="10000000"
-                    step="100000"
-                    value={filters.priceMax}
-                    onChange={(e) => handlePriceChange('max', parseInt(e.target.value))}
-                    className="range-slider"
-                  />
+
+                  {/* Dual range slider container */}
+                  <div className="dual-range-slider">
+                    {/* Track background */}
+                    <div className="dual-range-slider__track">
+                      {/* Highlighted range between min and max */}
+                      <div 
+                        className="dual-range-slider__range"
+                        style={{
+                          left: `${((filters.priceMin - actualPriceRange.min) / (actualPriceRange.max - actualPriceRange.min)) * 100}%`,
+                          right: `${100 - ((filters.priceMax - actualPriceRange.min) / (actualPriceRange.max - actualPriceRange.min)) * 100}%`
+                        }}
+                      />
+                    </div>
+
+                    {/* Min range input */}
+                    <input
+                      type="range"
+                      min={actualPriceRange.min}
+                      max={actualPriceRange.max}
+                      step="100000"
+                      value={filters.priceMin}
+                      onChange={(e) => handlePriceChange('min', e.target.value)}
+                      className="dual-range-slider__input dual-range-slider__input--min"
+                      aria-label="Minimum price"
+                    />
+
+                    {/* Max range input */}
+                    <input
+                      type="range"
+                      min={actualPriceRange.min}
+                      max={actualPriceRange.max}
+                      step="100000"
+                      value={filters.priceMax}
+                      onChange={(e) => handlePriceChange('max', e.target.value)}
+                      className="dual-range-slider__input dual-range-slider__input--max"
+                      aria-label="Maximum price"
+                    />
+                  </div>
+
+                  {/* Min/Max bounds display */}
+                  <div className="price-range-dual__bounds">
+                    <span>{formatPrice(actualPriceRange.min)}</span>
+                    <span>{formatPrice(actualPriceRange.max)}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -653,7 +895,7 @@ const SearchResults = () => {
             <div className="filter-divider"></div>
 
             {/* Duration */}
-            <div className="filter-group">
+            {/* <div className="filter-group">
               <h3 className="filter-group__title">Flight Duration</h3>
               <div className="filter-group__content">
                 {[
@@ -669,12 +911,12 @@ const SearchResults = () => {
                   />
                 ))}
               </div>
-            </div>
+            </div> */}
 
             <div className="filter-divider"></div>
 
             {/* Stops */}
-            <div className="filter-group">
+            {/* <div className="filter-group">
               <h3 className="filter-group__title">Stops</h3>
               <div className="filter-group__content">
                 {[
@@ -690,7 +932,7 @@ const SearchResults = () => {
                   />
                 ))}
               </div>
-            </div>
+            </div> */}
 
             {/* Ticket Class */}
             {flightClasses.length > 0 && (
@@ -934,7 +1176,7 @@ const FlightCard = ({ flight, formatPrice }) => {
         </div>
         <div className="flight-card__price">
           <div className="price-amount">{formatPrice(selectedClass.price)}</div>
-          <div className="price-label">/ người</div>
+          <div className="price-label">/ passenger</div>
         </div>
       </div>
 
@@ -977,11 +1219,11 @@ const FlightCard = ({ flight, formatPrice }) => {
       <div className="flight-card__footer">
         <div className="flight-card__badges">
           {flight.stops === 0 && (
-            <Badge variant="info" size="sm">Nonstop</Badge>
+            <Badge variant="info" size="sm"></Badge>
           )}
         </div>
         <Button size="sm">
-          Select Flight
+          More Details
         </Button>
       </div>
     </Card>

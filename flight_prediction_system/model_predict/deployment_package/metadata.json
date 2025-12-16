@@ -1,0 +1,45 @@
+{
+  "feature_columns": [
+    "airline_encoded",
+    "departure_airport_encoded",
+    "arrival_airport_encoded",
+    "classes_encoded",
+    "departure_time_bucket_encoded",
+    "booking_category_encoded",
+    "type_of_plane_encoded",
+    "day_of_week",
+    "month",
+    "day_of_month",
+    "is_weekend",
+    "is_month_start",
+    "is_month_end",
+    "quarter",
+    "days_to_flight",
+    "is_high_volatility_window",
+    "is_optimal_booking_window",
+    "q1",
+    "median",
+    "q3",
+    "mean",
+    "std",
+    "is_round_trip_route"
+  ],
+  "training_metrics": {
+    "train_mae": 295811.59375,
+    "train_rmse": 504825.8985432503,
+    "train_r2": 0.9037713408470154,
+    "val_mae": 314864.84375,
+    "val_rmse": 541371.6987652753,
+    "val_r2": 0.888099730014801
+  },
+  "trained_at": "2025-12-15T21:22:29.358620",
+  "total_routes": 25,
+  "airlines": [
+    "QH",
+    "VJ",
+    "VN",
+    "VU"
+  ],
+  "leakage_free": true,
+  "version": "2.0"
+}

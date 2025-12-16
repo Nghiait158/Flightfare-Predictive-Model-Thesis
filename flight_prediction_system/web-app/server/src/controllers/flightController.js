@@ -197,6 +197,92 @@ exports.searchFlights = async (req, res) => {
 };
 
 /**
+ * Get minimum prices for nearby dates (only fresh data)
+ */
+exports.getNearbyDatePrices = async (req, res) => {
+  try {
+    const { from, to, dates } = req.body;
+
+    if (!from || !to || !dates || !Array.isArray(dates)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: from, to, dates (array)'
+      });
+    }
+
+    // Get airport IDs
+    const airportQuery = `
+      SELECT 
+        (SELECT airport_id FROM airports WHERE airport_code = $1) as dep_id,
+        (SELECT airport_id FROM airports WHERE airport_code = $2) as arr_id
+    `;
+    const airportResult = await db.query(airportQuery, [from, to]);
+
+    if (!airportResult.rows[0].dep_id || !airportResult.rows[0].arr_id) {
+      return res.status(404).json({
+        success: false,
+        message: 'Airports not found'
+      });
+    }
+
+    const { dep_id, arr_id } = airportResult.rows[0];
+    const FRESH_DATA_THRESHOLD_HOURS = 6;
+
+    // Query for minimum price per date (only fresh data)
+    const priceQuery = `
+      SELECT 
+        fp.flight_date,
+        MIN(fp.price) as min_price,
+        MAX(fp.checked_at) as latest_checked_at,
+        EXTRACT(EPOCH FROM (NOW() - MAX(fp.checked_at)))/3600 as hours_old
+      FROM flight_prices fp
+      INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
+      INNER JOIN new_classes c ON fp.class_id = c.class_id
+      WHERE fs.departure_airport_id = $1
+        AND fs.arrival_airport_id = $2
+        AND fp.flight_date = ANY($3)
+        AND fs.is_active = true
+        AND c.is_active = true
+        AND EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 <= $4
+      GROUP BY fp.flight_date
+      ORDER BY fp.flight_date
+    `;
+
+    console.log(`Fetching nearby date prices for dates:`, dates);
+    const result = await db.query(priceQuery, [dep_id, arr_id, dates, FRESH_DATA_THRESHOLD_HOURS]);
+    
+    // Format response
+    const pricesByDate = {};
+    result.rows.forEach(row => {
+      pricesByDate[row.flight_date] = {
+        minPrice: parseFloat(row.min_price),
+        lastChecked: row.latest_checked_at,
+        hoursOld: parseFloat(row.hours_old),
+        isFresh: parseFloat(row.hours_old) <= FRESH_DATA_THRESHOLD_HOURS
+      };
+    });
+
+    console.log(`Found prices for ${result.rows.length} dates out of ${dates.length}`);
+
+    res.json({
+      success: true,
+      data: {
+        prices: pricesByDate,
+        freshDataThresholdHours: FRESH_DATA_THRESHOLD_HOURS
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching nearby date prices:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching nearby date prices',
+      error: error.message
+    });
+  }
+};
+
+/**
  * Get all airlines
  */
 exports.getAirlines = async (req, res) => {
@@ -269,6 +355,7 @@ exports.getCheapestTickets = async (req, res) => {
         fp.price,
         fp.currency,
         fp.flight_date,
+        TO_CHAR(fp.flight_date, 'YYYY-MM-DD') as flight_date_str,
         fp.checked_at,
         EXTRACT(DOW FROM fp.flight_date) as day_of_week,
         TO_CHAR(fp.flight_date, 'Dy, Mon DD') as formatted_date
@@ -289,7 +376,7 @@ exports.getCheapestTickets = async (req, res) => {
     const dateMinPrices = new Map();
     
     result.rows.forEach(row => {
-      const dateKey = row.flight_date.toISOString().split('T')[0];
+      const dateKey = row.flight_date_str; // Use pre-formatted string from SQL
       if (!dateMinPrices.has(dateKey) || row.price < dateMinPrices.get(dateKey).price) {
         dateMinPrices.set(dateKey, row);
       }
@@ -301,7 +388,8 @@ exports.getCheapestTickets = async (req, res) => {
         if (a.price !== b.price) {
           return a.price - b.price; // Lowest price first
         }
-        return new Date(a.flight_date) - new Date(b.flight_date); // Earliest date first
+        // Compare date strings directly (YYYY-MM-DD format sorts correctly)
+        return a.flight_date_str.localeCompare(b.flight_date_str);
       })
       .slice(0, limit)
       .map(flight => {
@@ -333,7 +421,7 @@ exports.getCheapestTickets = async (req, res) => {
           price: parseFloat(flight.price),
           currency: flight.currency,
           date: flight.formatted_date,
-          flightDate: flight.flight_date,
+          flightDate: flight.flight_date_str, // Use pre-formatted string from SQL (YYYY-MM-DD)
           time: `${formatTime(depDate)} — ${formatTime(arrDate)}`,
           duration: durationStr,
           flightType: 'Direct',
@@ -369,108 +457,6 @@ exports.getCheapestTickets = async (req, res) => {
 };
 
 /**
- * Get monthly prices - minimum price for each day in a month
- */
-exports.getMonthlyPrices = async (req, res) => {
-  try {
-    const { from, to, year, month } = req.query;
-    
-    console.log('getMonthlyPrices called with:', { from, to, year, month });
-
-    // Validate required fields
-    if (!from || !to || !year || !month) {
-      console.warn('Missing required fields');
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: from, to, year, month'
-      });
-    }
-
-    // Get airport IDs
-    const airportQuery = `
-      SELECT 
-        (SELECT airport_id FROM airports WHERE airport_code = $1) as dep_id,
-        (SELECT airport_id FROM airports WHERE airport_code = $2) as arr_id
-    `;
-    const airportResult = await db.query(airportQuery, [from, to]);
-    console.log('Airport IDs:', airportResult.rows[0]);
-
-    if (!airportResult.rows[0].dep_id || !airportResult.rows[0].arr_id) {
-      return res.status(404).json({
-        success: false,
-        message: 'Airports not found'
-      });
-    }
-
-    const { dep_id, arr_id } = airportResult.rows[0];
-
-    // Calculate date range for the month
-    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-    const endDate = new Date(year, month, 0); // Last day of month
-    const endDateStr = `${year}-${String(month).padStart(2, '0')}-${endDate.getDate()}`;
-
-    console.log(`📅 Date range: ${startDate} to ${endDateStr}`);
-
-    // Query to find minimum price for each date in the month
-    // Use DISTINCT ON to get one row per date with the lowest price
-    const monthlyQuery = `
-      SELECT DISTINCT ON (fp.flight_date)
-        fp.flight_date,
-        MIN(fp.price) OVER (PARTITION BY fp.flight_date) as min_price,
-        FIRST_VALUE(fp.currency) OVER (PARTITION BY fp.flight_date ORDER BY fp.price) as currency,
-        TO_CHAR(fp.flight_date, 'YYYY-MM-DD') as date_string
-      FROM flight_prices fp
-      INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
-      INNER JOIN airlines al ON fs.airline_id = al.airline_id
-      WHERE fs.departure_airport_id = $1
-        AND fs.arrival_airport_id = $2
-        AND fp.flight_date >= $3::date
-        AND fp.flight_date <= $4::date
-        AND fs.is_active = true
-        AND al.is_active = true
-      ORDER BY fp.flight_date ASC
-    `;
-
-    const result = await db.query(monthlyQuery, [dep_id, arr_id, startDate, endDateStr]);
-    console.log(`✅ Found prices for ${result.rows.length} days in the month`);
-
-    if (result.rows.length === 0) {
-      console.log('⚠️ No flight prices found for this route/month');
-    }
-
-    const monthlyPrices = result.rows.map(row => ({
-      date: row.date_string,
-      minPrice: parseFloat(row.min_price),
-      currency: row.currency || 'VND'
-    }));
-
-    res.json({
-      success: true,
-      data: monthlyPrices,
-      searchParams: {
-        from,
-        to,
-        year: parseInt(year),
-        month: parseInt(month),
-        dateRange: {
-          start: startDate,
-          end: endDateStr
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('Error fetching monthly prices:', error);
-    console.error('Error stack:', error.stack);
-    res.status(500).json({
-      success: false,
-      message: 'Error fetching monthly prices',
-      error: error.message
-    });
-  }
-};
-
-/**
  * Get all flight classes
  */
 exports.getFlightClasses = async (req, res) => {
@@ -491,10 +477,7 @@ exports.getFlightClasses = async (req, res) => {
     });
   }
 };
-
-/**
- * Get flight price history
- */
+// Get flight price history
 exports.getPriceHistory = async (req, res) => {
   try {
     const { scheduleId, classId, days = 30 } = req.query;
@@ -533,6 +516,128 @@ exports.getPriceHistory = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching price history',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Get price chart data - cheapest price per day for next 15 days
+ * Used for bar chart visualization
+ */
+exports.getPriceChartData = async (req, res) => {
+  try {
+    const { from, to, days = 15 } = req.query;
+    
+    console.log('getPriceChartData called with:', { from, to, days });
+
+    if (!from || !to) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: from, to'
+      });
+    }
+
+    // Get airport IDs
+    const airportQuery = `
+      SELECT 
+        (SELECT airport_id FROM airports WHERE airport_code = $1) as dep_id,
+        (SELECT airport_id FROM airports WHERE airport_code = $2) as arr_id
+    `;
+    const airportResult = await db.query(airportQuery, [from, to]);
+
+    if (!airportResult.rows[0].dep_id || !airportResult.rows[0].arr_id) {
+      return res.status(404).json({
+        success: false,
+        message: 'Airports not found'
+      });
+    }
+
+    const { dep_id, arr_id } = airportResult.rows[0];
+
+    // Query to get cheapest price per day for next X days
+    const priceChartQuery = `
+      WITH date_range AS (
+        SELECT generate_series(
+          CURRENT_DATE,
+          CURRENT_DATE + INTERVAL '${parseInt(days)} days',
+          '1 day'::interval
+        )::date as date
+      ),
+      cheapest_per_day AS (
+        SELECT 
+          fp.flight_date,
+          MIN(fp.price) as min_price,
+          MAX(fp.currency) as currency,
+          EXTRACT(DOW FROM fp.flight_date) as day_of_week,
+          TO_CHAR(fp.flight_date, 'Day') as day_name,
+          TO_CHAR(fp.flight_date, 'Mon DD') as formatted_date,
+          COUNT(DISTINCT fs.schedule_id) as flight_count
+        FROM flight_prices fp
+        INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
+        WHERE fs.departure_airport_id = $1
+          AND fs.arrival_airport_id = $2
+          AND fs.is_active = true
+          AND fp.flight_date >= CURRENT_DATE
+          AND fp.flight_date <= CURRENT_DATE + INTERVAL '${parseInt(days)} days'
+        GROUP BY fp.flight_date
+      )
+      SELECT 
+        dr.date as flight_date,
+        COALESCE(cpd.min_price, NULL) as min_price,
+        COALESCE(cpd.currency, 'VND') as currency,
+        EXTRACT(DOW FROM dr.date) as day_of_week,
+        TO_CHAR(dr.date, 'Day') as day_name,
+        TO_CHAR(dr.date, 'Mon DD') as formatted_date,
+        COALESCE(cpd.flight_count, 0) as flight_count,
+        CASE WHEN EXTRACT(DOW FROM dr.date) IN (0, 6) THEN true ELSE false END as is_weekend
+      FROM date_range dr
+      LEFT JOIN cheapest_per_day cpd ON dr.date = cpd.flight_date
+      ORDER BY dr.date ASC
+    `;
+
+    const result = await db.query(priceChartQuery, [dep_id, arr_id]);
+    console.log(`Found ${result.rows.length} days in range`);
+
+    const priceData = result.rows.map(row => ({
+      date: row.flight_date,
+      formattedDate: row.formatted_date?.trim(),
+      dayName: row.day_name?.trim(),
+      dayOfWeek: parseInt(row.day_of_week),
+      price: row.min_price ? parseFloat(row.min_price) : null,
+      currency: row.currency,
+      flightCount: parseInt(row.flight_count),
+      isWeekend: row.is_weekend,
+      hasData: row.min_price !== null
+    }));
+
+    // Calculate price statistics for available data
+    const pricesWithData = priceData.filter(d => d.hasData).map(d => d.price);
+    const statistics = pricesWithData.length > 0 ? {
+      min: Math.min(...pricesWithData),
+      max: Math.max(...pricesWithData),
+      avg: pricesWithData.reduce((a, b) => a + b, 0) / pricesWithData.length,
+      count: pricesWithData.length
+    } : null;
+
+    res.json({
+      success: true,
+      data: {
+        prices: priceData,
+        statistics,
+        searchParams: {
+          from,
+          to,
+          days: parseInt(days)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching price chart data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching price chart data',
       error: error.message
     });
   }

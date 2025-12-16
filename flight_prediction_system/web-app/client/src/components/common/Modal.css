@@ -22,7 +22,7 @@
 
 /* Modal Container */
 .modal {
-  background: linear-gradient(135deg, rgb(15, 23, 42) 0%, rgb(30, 58, 138) 100%);
+  background: rgb(15, 23, 42);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
   width: 90%;

@@ -18,8 +18,8 @@ body {
 .App {
   min-height: 100vh;
   position: relative;
-  /* background: gradient from slate-900 through blue to cyan */
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  /* background: solid slate color */
+  background: #1e293b;
 }
 
 /* Video Background Container - covers header + hero */
@@ -51,12 +51,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    180deg,
-    rgba(15, 23, 42, 0.7) 0%,
-    rgba(30, 41, 59, 0.75) 50%,
-    rgba(51, 65, 85, 0.85) 100%
-  );
+  background: rgba(30, 41, 59, 0.8);
 }
 
 /* Make sure all content is above video */

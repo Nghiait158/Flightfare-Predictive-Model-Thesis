@@ -335,7 +335,7 @@
 
 .search-submit-btn {
   width: 100%;
-  background: linear-gradient(to right, #3b82f6, #22d3ee);
+  background: #3b82f6;
   color: white;
   height: 48px;
   font-size: 18px;
@@ -361,7 +361,7 @@
 }
 
 .search-submit-btn:hover {
-  background: linear-gradient(to right, #2563eb, #06b6d4);
+  background: #2563eb;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
               0 4px 6px -2px rgba(0, 0, 0, 0.05);
   transform: translateY(-2px);

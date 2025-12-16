@@ -1,83 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import flightService from '../../services/flightService';
 import './PriceChart.css';
 
 const PriceChart = ({ fromAirport, toAirport, onSelectDate }) => {
   const [priceData, setPriceData] = useState([]);
-  const [selectedBar, setSelectedBar] = useState(null);
-  const [tripType, setTripType] = useState('one-way');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [hoveredBar, setHoveredBar] = useState(null);
+  const [tripType, setTripType] = useState('one-way');
 
-  useEffect(() => {
-    if (fromAirport && toAirport) {
-      fetchNext15DaysPrices();
-    }
-  }, [fromAirport, toAirport]);
+  const fetchPriceData = useCallback(async () => {
+    if (!fromAirport || !toAirport) return;
 
-  const fetchNext15DaysPrices = async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      console.log('📊 Fetching 15 days prices:', { 
-        from: fromAirport, 
-        to: toAirport
-      });
-      
-      // Get prices for next 15 days using cheapest tickets API
-      const response = await flightService.getCheapestTickets({
+      const response = await flightService.getPriceChartData({
         from: fromAirport,
         to: toAirport,
-        daysAhead: 15,
-        limit: 15
+        days: 15
       });
 
-      console.log('📈 Price chart response:', response);
-
-      if (response.success && response.data.flights) {
-        // Transform to array format for chart
-        const chartData = response.data.flights.map(flight => ({
-          date: flight.flightDate,
-          dateFormatted: flight.date,
-          price: flight.price,
-          currency: flight.currency,
-          time: flight.time,
-          duration: flight.duration,
-          airline: flight.airlineName
-        }));
-
-        // Sort by date
-        chartData.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-        console.log('✅ Chart data loaded:', chartData.length, 'days');
-        setPriceData(chartData);
+      if (response.success && response.data) {
+        const prices = response.data.prices || [];
+        setPriceData(prices);
+        
+        // Auto-select today's date if available
+        const today = new Date().toISOString().split('T')[0];
+        const todayData = prices.find(p => 
+          new Date(p.date).toISOString().split('T')[0] === today && p.hasData
+        );
+        
+        if (todayData) {
+          setSelectedDate(todayData.date);
+        } else {
+          // If today not available, select first available date
+          const firstAvailable = prices.find(p => p.hasData);
+          if (firstAvailable) {
+            setSelectedDate(firstAvailable.date);
+          }
+        }
       } else {
-        console.warn('⚠️ No price data in response');
+        setError('No price data available');
         setPriceData([]);
       }
     } catch (err) {
-      console.error('❌ Error fetching price chart data:', err);
-      console.error('Error details:', err.response?.data || err.message);
-      
-      let errorMessage = 'Failed to load price data';
-      if (err.response) {
-        errorMessage = `Server error: ${err.response.data?.message || err.response.statusText}`;
-      } else if (err.request) {
-        errorMessage = 'Cannot connect to server. Please check if backend is running.';
-      } else {
-        errorMessage = err.message;
-      }
-      
-      setError(errorMessage);
+      console.error('Error fetching price chart:', err);
+      setError('Failed to load price chart');
       setPriceData([]);
     } finally {
       setIsLoading(false);
     }
+  }, [fromAirport, toAirport]);
+
+  useEffect(() => {
+    fetchPriceData();
+  }, [fetchPriceData]);
+
+  // Calculate bar height using the formula:
+  // Height% = H_min + ((Price - Price_min) / (Price_max - Price_min)) × (H_max - H_min)
+  const calculateBarHeight = (price, pricesWithData) => {
+    const H_MIN = 60; // Minimum height percentage (60%)
+    const H_MAX = 100; // Maximum height percentage (100%)
+    
+    if (!price || pricesWithData.length === 0) return H_MIN;
+    
+    const prices = pricesWithData.map(p => p.price);
+    const priceMin = Math.min(...prices);
+    const priceMax = Math.max(...prices);
+    
+    // If all prices are the same, return middle height
+    if (priceMax === priceMin) return (H_MIN + H_MAX) / 2;
+    
+    // Apply the formula
+    const heightPercent = H_MIN + ((price - priceMin) / (priceMax - priceMin)) * (H_MAX - H_MIN);
+    
+    return heightPercent;
   };
 
   const formatPrice = (price, currency) => {
-    if (!price) return null;
+    if (!price) return 'N/A';
     
     if (currency === 'VND') {
       return `${Math.floor(price / 1000)}k`;
@@ -85,139 +89,155 @@ const PriceChart = ({ fromAirport, toAirport, onSelectDate }) => {
     return `$${Math.round(price)}`;
   };
 
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const day = date.getDate();
-    const month = date.toLocaleDateString('en-US', { month: 'short' });
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
-    return { day, month, weekday };
+  const formatDate = (dateStr) => {
+    // Parse date string manually to avoid timezone issues
+    const dateString = dateStr.toString().split('T')[0]; // "2024-12-17"
+    const [year, month, dayNum] = dateString.split('-').map(Number);
+    
+    // Create date in UTC to avoid timezone conversion
+    const date = new Date(Date.UTC(year, month - 1, dayNum));
+    
+    return {
+      day: date.getUTCDate(),
+      dayName: date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }),
+      month: date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
+    };
   };
 
-  const getMaxPrice = () => {
-    if (priceData.length === 0) return 0;
-    return Math.max(...priceData.map(d => d.price));
+  const handleBarClick = (dateData) => {
+    if (!dateData.hasData) return;
+    setSelectedDate(dateData.date);
   };
 
-  const getMinPrice = () => {
-    if (priceData.length === 0) return 0;
-    return Math.min(...priceData.map(d => d.price));
-  };
-
-  const handleBarClick = (index) => {
-    setSelectedBar(selectedBar === index ? null : index);
-  };
-
-  const handleSelectDateClick = () => {
-    if (selectedBar !== null && priceData[selectedBar] && onSelectDate) {
-      const selectedFlight = priceData[selectedBar];
-      // Convert flightDate to YYYY-MM-DD format using local timezone
-      const date = new Date(selectedFlight.date);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const dateString = `${year}-${month}-${day}`;
-      
-      onSelectDate(dateString);
-      console.log('Date selected from PriceChart:', dateString, 'Original:', selectedFlight.date);
+  const handleSelectDate = () => {
+    if (!selectedDate) return;
+    
+    const selectedData = priceData.find(p => p.date === selectedDate);
+    if (selectedData && onSelectDate) {
+      // Extract date string directly without Date parsing to avoid timezone issues
+      // Handle both "2024-12-17" and "2024-12-17T00:00:00.000Z" formats
+      const dateStr = selectedDate.toString().includes('T') 
+        ? selectedDate.toString().split('T')[0]  // "2024-12-17T..." → "2024-12-17"
+        : selectedDate.toString();  // Already "2024-12-17"
+      onSelectDate(dateStr);
     }
   };
 
-  const maxPrice = getMaxPrice();
-  const minPrice = getMinPrice();
-  const lowestPriceIndex = priceData.findIndex(d => d.price === minPrice);
+  const getSelectedDateText = () => {
+    if (!selectedDate) return 'Select a date';
+    
+    const selectedData = priceData.find(p => p.date === selectedDate);
+    if (!selectedData) return 'Select a date';
+    
+    // Parse date string manually to avoid timezone issues
+    const dateString = selectedDate.toString().split('T')[0]; // "2024-12-17"
+    const [year, month, dayNum] = dateString.split('-').map(Number);
+    
+    // Create date in UTC to avoid timezone conversion
+    const date = new Date(Date.UTC(year, month - 1, dayNum));
+    const monthName = date.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+    const day = date.getUTCDate();
+    
+    return `Select ${monthName} ${day}`;
+  };
+
+  // Filter data with prices for height calculation
+  const pricesWithData = priceData.filter(d => d.hasData);
+
+  if (isLoading) {
+    return (
+      <div className="price-chart-container">
+        <div className="price-chart-header">
+          <h2 className="price-chart-title">Price chart</h2>
+        </div>
+        <div className="price-chart-loading">
+          <div className="loading-spinner"></div>
+          <span>Loading price chart...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="price-chart-container">
+        <div className="price-chart-header">
+          <h2 className="price-chart-title">Price chart</h2>
+        </div>
+        <div className="price-chart-error">
+          <span>{error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (priceData.length === 0 || pricesWithData.length === 0) {
+    return (
+      <div className="price-chart-container">
+        <div className="price-chart-header">
+          <h2 className="price-chart-title">Price chart</h2>
+        </div>
+        <div className="price-chart-empty">
+          <span>No price data available for this route</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="price-chart-container">
       <div className="price-chart-header">
         <h2 className="price-chart-title">Price chart</h2>
         
-        <div className="trip-type-toggle">
-          <button
-            className={`trip-type-btn ${tripType === 'one-way' ? 'active' : ''}`}
-            onClick={() => setTripType('one-way')}
-          >
-            One-way
-          </button>
-          <button
-            className={`trip-type-btn ${tripType === 'round-trip' ? 'active' : ''}`}
-            onClick={() => setTripType('round-trip')}
-          >
-            Round trip
-          </button>
-        </div>
       </div>
 
-      {isLoading ? (
-        <div className="price-chart-loading">
-          <div className="loading-spinner"></div>
-          <span>Loading price chart...</span>
-        </div>
-      ) : error ? (
-        <div className="price-chart-error">
-          <span>{error}</span>
-        </div>
-      ) : priceData.length === 0 ? (
-        <div className="no-prices-message">
-          <p>No flight prices available for the next 15 days.</p>
-          <p style={{ fontSize: '12px', marginTop: '8px', color: '#64748b' }}>
-            Try a different route or check if flight data exists.
-          </p>
-        </div>
-      ) : (
-        <div className="price-chart-content">
-          {/* Price Range Info */}
-          <div className="price-range-info">
-            <div className="price-info-item">
-              <span className="price-info-label">Lowest</span>
-              <span className="price-info-value">{formatPrice(minPrice, priceData[0]?.currency)}</span>
-            </div>
-            <div className="price-info-item">
-              <span className="price-info-label">Highest</span>
-              <span className="price-info-value">{formatPrice(maxPrice, priceData[0]?.currency)}</span>
-            </div>
-            <div className="price-info-item">
-              <span className="price-info-label">Average</span>
-              <span className="price-info-value">
-                {formatPrice(
-                  Math.round(priceData.reduce((sum, d) => sum + d.price, 0) / priceData.length),
-                  priceData[0]?.currency
-                )}
-              </span>
-            </div>
-          </div>
+      <div className="price-chart-content">
+        <div className="chart-navigation">
+          <button className="nav-btn nav-prev" aria-label="Previous month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6"/>
+            </svg>
+          </button>
 
-          {/* Bar Chart */}
-          <div className="bar-chart-wrapper">
-            <div className="bar-chart">
-              {priceData.map((data, index) => {
-                const heightPercent = (data.price / maxPrice) * 100;
-                const isLowest = index === lowestPriceIndex;
-                const isSelected = selectedBar === index;
-                const dateInfo = formatDate(data.date);
+          <div className="chart-wrapper">
+            <div className="chart-bars-container">
+              {priceData.map((dayData, index) => {
+                const { day, dayName } = formatDate(dayData.date);
+                const isSelected = selectedDate === dayData.date;
+                const isHovered = hoveredBar === index;
+                const barHeight = calculateBarHeight(dayData.price, pricesWithData);
 
                 return (
-                  <div
-                    key={index}
-                    className={`bar-item ${isLowest ? 'lowest' : ''} ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleBarClick(index)}
+                  <div 
+                    key={index} 
+                    className={`chart-bar-item ${!dayData.hasData ? 'no-data' : ''} ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleBarClick(dayData)}
+                    onMouseEnter={() => setHoveredBar(index)}
+                    onMouseLeave={() => setHoveredBar(null)}
                   >
+                    {/* Tooltip - show on hover OR when selected */}
+                    {(isHovered || isSelected) && dayData.hasData && (
+                      <div className="bar-tooltip">
+                        from {formatPrice(dayData.price, dayData.currency)}
+                      </div>
+                    )}
+
+                    {/* Bar */}
                     <div className="bar-column">
-                      <div className="bar-price-label">
-                        {formatPrice(data.price, data.currency)}
-                      </div>
-                      <div 
-                        className="bar-fill"
-                        style={{ height: `${heightPercent}%` }}
-                      >
-                        {isLowest && (
-                          <span className="best-deal-badge">Best</span>
-                        )}
-                      </div>
+                      {dayData.hasData ? (
+                        <div 
+                          className={`bar ${isWeekend(dayData.dayOfWeek) ? 'weekend' : ''}`}
+                          style={{ height: `${barHeight}%` }}
+                        />
+                      ) : (
+                        <div className="bar-empty" style={{ height: '20%' }} />
+                      )}
                     </div>
+
+                    {/* Date label */}
                     <div className="bar-label">
-                      <div className="bar-date-day">{dateInfo.day}</div>
-                      <div className="bar-date-month">{dateInfo.month}</div>
-                      <div className="bar-date-weekday">{dateInfo.weekday}</div>
+                      <span className="bar-day">{day}</span>
+                      <span className="bar-day-name">{dayName}</span>
                     </div>
                   </div>
                 );
@@ -225,19 +245,29 @@ const PriceChart = ({ fromAirport, toAirport, onSelectDate }) => {
             </div>
           </div>
 
-          {/* Select Date Button */}
-          {selectedBar !== null && priceData[selectedBar] && (
-            <button 
-              className="select-date-btn"
-              onClick={handleSelectDateClick}
-            >
-              Select {formatDate(priceData[selectedBar].date).month} {formatDate(priceData[selectedBar].date).day}
-            </button>
-          )}
+          <button className="nav-btn nav-next" aria-label="Next month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </button>
         </div>
-      )}
+
+        <button 
+          className="select-date-btn"
+          onClick={handleSelectDate}
+          disabled={!selectedDate}
+        >
+          {getSelectedDateText()}
+        </button>
+      </div>
     </div>
   );
 };
 
+// Helper function to check if day is weekend
+const isWeekend = (dayOfWeek) => {
+  return dayOfWeek === 0 || dayOfWeek === 6; // Sunday = 0, Saturday = 6
+};
+
 export default PriceChart;
+

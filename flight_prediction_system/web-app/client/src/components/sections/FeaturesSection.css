@@ -59,8 +59,8 @@
 }
 
 .feature-icon-wrapper {
-  /* bg-gradient-to-br from-blue-400 to-cyan-400 rounded-lg p-3 w-fit mb-4 */
-  background: linear-gradient(to bottom right, #60a5fa, #22d3ee);
+  /* bg-blue-400 rounded-lg p-3 w-fit mb-4 */
+  background: #60a5fa;
   border-radius: 8px;
   padding: 12px;
   width: fit-content;

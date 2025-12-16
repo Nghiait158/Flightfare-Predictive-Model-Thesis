@@ -44,7 +44,8 @@ const crawlerService = {
         trip_type: actualTripType,
         use_retry: true,
         clear_screenshots: false,
-        auto_crawl_days: 0 // Only crawl the specific date
+        auto_crawl_days: 0, // Only crawl the specific date
+        save_in_db: true // Save crawled results to database
       };
 
       console.log('🚀 Crawling from BayDep with params:', payload);
@@ -90,7 +91,8 @@ const crawlerService = {
         infant: infants,
         trip_type: actualTripType,
         use_retry: true,
-        clear_screenshots: false
+        clear_screenshots: false,
+        save_in_db: true // Save crawled results to database
       };
 
       console.log('🚀 Crawling from VietJet with params:', payload);

@@ -1,0 +1,121 @@
+base_class,linking_class
+
+------ VJ -----
+Eco, Eco
+Economy, Eco
+Economy (Y_SBoss), Eco
+Eco (T1_ECO), Eco
+Eco (B1_ECO), Eco
+Eco (I1_ECO), Eco
+Eco (U1_ECO), Eco
+Economy (U1_ECO), Eco
+Economy (U1_DLX), Eco
+Economy (J1_ECO), Eco
+Economy (J1_DLX), Eco
+Eco (Z1_ECO), Eco
+Eco (J1_ECO), Eco
+Economy (Z1_ECO), Eco
+Economy (Z1_DLX), Eco
+Economy (W1_DLX), Eco
+Economy (W1_ECO), Eco
+
+Deluxe, Deluxe
+Deluxe (J1_DLX), Deluxe
+Deluxe (T1_DLX), Deluxe
+Deluxe (B1_DLX), Deluxe
+Deluxe (I1_DLX), Deluxe
+Deluxe (U1_DLX), Deluxe
+Deluxe (Z1_DLX), Deluxe
+Deluxe (W1_DLX), Deluxe
+
+Skyboss, Skyboss
+SkyBoss, Skyboss
+SkyBoss (Y_SBoss), Skyboss
+
+Business, Business
+SkybossBusiness, Business
+SkybossBusiness (C_Boss), Business
+Business (C_Boss), Business
+
+
+---- Vn ----
+Phổ thông đặc biệt linh hoạt, Premium Economy Flex
+Premium Economy Flex, Premium Economy Flex
+Premium Economy Flex (W), Premium Economy Flex
+(W), Premium Economy Flex
+
+Thương gia linh hoạt, Business Flex
+Business Flex, Business Flex
+Business Flex (J), Business Flex
+(J), Business Flex
+(C), Business Flex
+Business Flex (C), Business Flex
+
+Phổ thông linh hoạt, Economy Flex
+Economy Flex, Economy Flex
+Economy Flex (B), Economy Flex
+Economy Flex (M), Economy Flex
+Economy Flex (S), Economy Flex
+
+Phổ thông tiêu chuẩn, Economy Classic
+Economy Classic, Economy Classic
+Economy Classic (S), Economy Classic
+Economy Classic (H), Economy Classic
+Economy Classic (K), Economy Classic
+Economy Classic (L), Economy Classic
+Economy Classic (Q), Economy Classic
+
+Phổ thông đặc biệt tiêu chuẩn, Premium Economy Classic
+Premium Economy Classic, Premium Economy Classic
+Premium Economy Classic (Z), Premium Economy Classic
+(Z), Premium Economy Classic
+Premium Economy Classic (U), Premium Economy Classic
+(U), Premium Economy Classic
+
+Phổ thông tiết kiệm, Economy Lite
+Economy Lite, Economy Lite
+Economy Lite (Q), Economy Lite
+Economy Lite (N), Economy Lite
+Economy Lite (R), Economy Lite
+
+Phổ thông siêu tiết kiệm, Economy Super Lite
+Economy Super Lite, Economy Super Lite
+
+Thương gia tiêu chuẩn, Business Classic
+Business Classic, Business Classic
+</strong> |                 Plating: <strong>VN, Business Classic
+Business Classic (D), Business Classic
+(D), Business Classic
+Business Classic (I), Business Classic
+(I), Business Classic
+
+
+---- QH ----
+EconomyFlex, Economy Flex
+EconomyFlex (B), Economy Flex
+EconomyFlex (W), Economy Flex
+
+EconomySmart, Economy Smart
+EconomySmart (M), Economy Smart
+EconomySmart (N), Economy Smart
+EconomySmart (L), Economy Smart
+EconomySmart (Q), Economy Smart
+EconomySmart (K), Economy Smart
+EconomySmart (T), Economy Smart
+EconomySaverMax, Economy Smart
+Hotdeal, Economy Smart
+
+BusinessFlex, Business Flex
+BusinessFlex (J), Business Flex
+
+BusinessSmart, Business Smart
+BusinessSmart (I), Business Smart
+BusinessSmart (C), Business Smart
+
+---- VU ----
+ECONOMY, ECONOMY
+
+PREMIUM, PREMIUM
+PREMIUM (W), PREMIUM
+
+

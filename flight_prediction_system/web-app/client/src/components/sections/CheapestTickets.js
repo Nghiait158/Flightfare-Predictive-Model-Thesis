@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import flightService from '../../services/flightService';
 import './CheapestTickets.css';
 
-const CheapestTickets = ({ fromAirport, toAirport, onSelectDate }) => {
+const CheapestTickets = ({ fromAirport, toAirport, onSelectFlight }) => {
   const [cheapestFlights, setCheapestFlights] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -10,17 +10,7 @@ const CheapestTickets = ({ fromAirport, toAirport, onSelectDate }) => {
   const [canScrollRight, setCanScrollRight] = useState(false);
   const scrollContainerRef = useRef(null);
 
-  useEffect(() => {
-    if (fromAirport && toAirport) {
-      fetchCheapestFlights();
-    }
-  }, [fromAirport, toAirport]);
-
-  useEffect(() => {
-    checkScrollButtons();
-  }, [cheapestFlights]);
-
-  const fetchCheapestFlights = async () => {
+  const fetchCheapestFlights = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     
@@ -45,9 +35,15 @@ const CheapestTickets = ({ fromAirport, toAirport, onSelectDate }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fromAirport, toAirport]);
 
-  const checkScrollButtons = () => {
+  useEffect(() => {
+    if (fromAirport && toAirport) {
+      fetchCheapestFlights();
+    }
+  }, [fromAirport, toAirport, fetchCheapestFlights]);
+
+  const checkScrollButtons = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -57,7 +53,11 @@ const CheapestTickets = ({ fromAirport, toAirport, onSelectDate }) => {
 
     setCanScrollLeft(scrollLeft > 0);
     setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 1);
-  };
+  }, []);
+
+  useEffect(() => {
+    checkScrollButtons();
+  }, [cheapestFlights, checkScrollButtons]);
 
   const scrollToDirection = (direction) => {
     const container = scrollContainerRef.current;
@@ -76,16 +76,14 @@ const CheapestTickets = ({ fromAirport, toAirport, onSelectDate }) => {
 
   const handleFlightClick = (flight) => {
     console.log('Selected cheapest flight:', flight);
-    if (onSelectDate && flight.flightDate) {
-      // Convert flightDate to YYYY-MM-DD format using local timezone
-      const date = new Date(flight.flightDate);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const dateString = `${year}-${month}-${day}`;
-      
-      onSelectDate(dateString);
-      console.log('Date selected from CheapestTickets:', dateString, 'Original:', flight.flightDate);
+    
+    if (onSelectFlight && flight.flightDate) {
+      // Extract date string directly without Date parsing to avoid timezone issues
+      // Handle both "2024-12-17" and "2024-12-17T00:00:00.000Z" formats
+      const dateStr = flight.flightDate.toString().includes('T')
+        ? flight.flightDate.toString().split('T')[0]  // "2024-12-17T..." → "2024-12-17"
+        : flight.flightDate.toString();  // Already "2024-12-17"
+      onSelectFlight(dateStr);
     }
   };
 

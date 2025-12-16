@@ -14,6 +14,20 @@ const flightService = {
     }
   },
 
+  getNearbyDatePrices: async (from, to, dates) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/flights/nearby-prices`, {
+        from,
+        to,
+        dates
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching nearby date prices:', error);
+      throw error;
+    }
+  },
+
 
   getFlightById: async (flightId) => {
     try {
@@ -79,12 +93,12 @@ const flightService = {
     }
   },
 
-  getMonthlyPrices: async (params) => {
+  getPriceChartData: async (params) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/flights/monthly-prices`, { params });
+      const response = await axios.get(`${API_BASE_URL}/flights/price-chart`, { params });
       return response.data;
     } catch (error) {
-      console.error('Error fetching monthly prices:', error);
+      console.error('Error fetching price chart data:', error);
       throw error;
     }
   },

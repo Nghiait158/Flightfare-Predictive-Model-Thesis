@@ -275,18 +275,19 @@ export async function crawlData_byDate_from_VietJetPage(page, dateString, depart
                 if (classMatch) classes = classMatch[1];
                 
                 // --- FIX: Always generate flight_date from the expected date ---
+                // Use plain date format (YYYY-MM-DD) without timezone to avoid timezone conversion issues
                 let iso_flight_date = null;
                 try {
                     const dateParts = expectedFlightDate.split('/');
                     if (dateParts.length === 3) {
-                        const day = parseInt(dateParts[0]);
-                        const month = parseInt(dateParts[1]) - 1;
-                        const year = parseInt(dateParts[2]);
-                        const dateObj = new Date(Date.UTC(year, month, day));
-                        iso_flight_date = dateObj.toISOString();
+                        const day = String(dateParts[0]).padStart(2, '0');
+                        const month = String(dateParts[1]).padStart(2, '0');
+                        const year = dateParts[2];
+                        // Use plain date format (YYYY-MM-DD) without time/timezone
+                        iso_flight_date = `${year}-${month}-${day}`;
                     }
                 } catch (error) {
-                    // This should not happen if expectedFlightDate is always correct
+                    console.warn('Failed to parse flight date:', expectedFlightDate);
                 }
 
                 let cleaned_price = total_price.replace(/,/g, '').replace(/\s*VND\s*/g, '').replace(/\s*₫\s*/g, '').trim();

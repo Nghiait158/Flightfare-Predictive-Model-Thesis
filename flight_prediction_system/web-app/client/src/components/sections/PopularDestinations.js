@@ -30,7 +30,13 @@ const PopularDestinations = ({ fromAirport, onSelectDestination }) => {
       const data = await flightService.getPopularDestinations(airportCode);
       
       if (data.success) {
-        setDestinations(data.data.destinations || []);
+        const destinations = data.data.destinations || [];
+        
+        // Log data freshness info
+        const freshCount = destinations.filter(d => d.isFresh !== false).length;
+        console.log(`Popular Destinations: ${freshCount}/${destinations.length} destinations have fresh data (< 24h old)`);
+        
+        setDestinations(destinations);
       } else {
         setError(data.message || 'Failed to load destinations');
       }

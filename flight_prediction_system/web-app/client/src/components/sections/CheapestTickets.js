@@ -23,7 +23,13 @@ const CheapestTickets = ({ fromAirport, toAirport, onSelectFlight }) => {
       });
 
       if (response.success && response.data) {
-        setCheapestFlights(response.data.flights || []);
+        const flights = response.data.flights || [];
+        
+        // Log data freshness info
+        const freshCount = flights.filter(f => f.isFresh !== false).length;
+        console.log(`Cheapest Tickets: ${freshCount}/${flights.length} flights have fresh data (< 24h old)`);
+        
+        setCheapestFlights(flights);
       } else {
         setError('No flights found');
         setCheapestFlights([]);

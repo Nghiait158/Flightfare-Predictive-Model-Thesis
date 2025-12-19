@@ -11,8 +11,19 @@ export async function crawlData_byDate_from_BayDepPageV2(page, dateString, depar
 
     const timeStartCrawl = Date.now();
     
+    // Convert dateString (DDMMYYYY) to YYYY-MM-DD format for consistency
+    let requestedDateISO = null;
+    if (dateString && dateString.length === 8) {
+        const day = dateString.substring(0, 2);
+        const month = dateString.substring(2, 4);
+        const year = dateString.substring(4, 8);
+        requestedDateISO = `${year}-${month}-${day}`;
+    }
+    console.log(`📅 Requested date (ISO): ${requestedDateISO}`);
+    
     // Evaluate and extract data for all flight options
-    const allFlightsData = await page.evaluate((adultCount, childCount, infantCount) => {
+    // Pass requestedDateISO to page.evaluate to use as primary date source
+    const allFlightsData = await page.evaluate((adultCount, childCount, infantCount, requestedDate) => {
         const results = [];
         const fareOptionElements = Array.from(document.querySelectorAll('.list-flight > .fare-option'));
 
@@ -31,15 +42,23 @@ export async function crawlData_byDate_from_BayDepPageV2(page, dateString, depar
                 data.departure_airport = departureInfo.querySelector('.airport-code')?.textContent.trim() || null;
                 data.depart_time = departureInfo.querySelector('.time')?.textContent.trim().replace(/\D/g,':') || null;
 
-                const dateEl = departureInfo.querySelector('.date');
-                if (dateEl) {
-                    const dateText = dateEl.textContent.trim();
-                    const dateParts = dateText.split('/');
-                    if (dateParts.length === 3) {
-                        const day = dateParts[0].padStart(2, '0');
-                        const month = dateParts[1].padStart(2, '0');
-                        const year = dateParts[2];
-                        data.flight_date = `${year}-${month}-${day}T00:00:00.000Z`;
+                // ✅ FIX: Use requested date as primary source to avoid date mismatch
+                // The website may show flights from different dates, but we want to record
+                // them under the date we requested for consistency
+                if (requestedDate) {
+                    data.flight_date = requestedDate;
+                } else {
+                    // Fallback: parse date from website HTML (legacy behavior)
+                    const dateEl = departureInfo.querySelector('.date');
+                    if (dateEl) {
+                        const dateText = dateEl.textContent.trim();
+                        const dateParts = dateText.split('/');
+                        if (dateParts.length === 3) {
+                            const day = dateParts[0].padStart(2, '0');
+                            const month = dateParts[1].padStart(2, '0');
+                            const year = dateParts[2];
+                            data.flight_date = `${year}-${month}-${day}`;
+                        }
                     }
                 }
 
@@ -85,7 +104,7 @@ export async function crawlData_byDate_from_BayDepPageV2(page, dateString, depar
         });
         
         return results;
-    }, adult, child, infant);
+    }, adult, child, infant, requestedDateISO);
 
     if (!allFlightsData || allFlightsData.length === 0) {
         throw new Error("Didn't find any flight options to process.");

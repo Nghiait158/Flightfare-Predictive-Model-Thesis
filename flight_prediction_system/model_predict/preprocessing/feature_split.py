@@ -46,7 +46,7 @@ def finalize_and_split(input_file):
         airline_df = df[df['flight_number'].str.startswith(code)]
         
         if not airline_df.empty:
-            file_name = f"{code}_flight_data.csv"
+            file_name = f"{code}_flight_data1.csv"
             airline_df.to_csv(file_name, index=False)
             count_summary[code] = len(airline_df)
             print(f"-> Đã xuất file: {file_name} ({len(airline_df)} dòng)")

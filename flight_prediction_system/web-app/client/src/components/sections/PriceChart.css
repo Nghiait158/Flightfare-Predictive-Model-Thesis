@@ -4,8 +4,9 @@
   background: rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   position: relative;
-  z-index: 1;
+  z-index: 20; /* Higher than main-background (z-index: 2) and main-container (z-index: 10) */
   animation: slideUp 0.5s ease-out;
+  overflow: visible; /* Allow tooltip to overflow container */
 }
 
 @keyframes slideUp {
@@ -24,7 +25,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 32px;
+  /* margin-bottom: 32px; */
 }
 
 .price-chart-title {
@@ -109,7 +110,7 @@
   flex: 1;
   overflow-x: auto;
   overflow-y: visible;
-  padding: 40px 0 40px;
+  padding: 80px 0 0px; /* Increased top padding for tooltip space */
   position: relative;
 }
 
@@ -151,6 +152,12 @@
   gap: 8px;
   cursor: pointer;
   position: relative;
+  z-index: 1; /* Default z-index */
+}
+
+.chart-bar-item:hover,
+.chart-bar-item.selected {
+  z-index: 100; /* Bring to front when hovered or selected */
 }
 
 .chart-bar-item.no-data {
@@ -213,9 +220,9 @@
 /* Bar Tooltip */
 .bar-tooltip {
   position: absolute;
-  bottom: 100%;
+  bottom: calc(100% + 12px); /* Positioned above the bar-column */
   left: 50%;
-  transform: translateX(-50%) translateY(-8px);
+  transform: translateX(-50%);
   background: #3b82f6;
   color: white;
   padding: 8px 16px;
@@ -223,8 +230,9 @@
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  z-index: 10;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  z-index: 1000; /* Very high z-index to ensure visibility */
+  pointer-events: none; /* Prevent tooltip from interfering with mouse events */
   animation: tooltipFadeIn 0.2s ease;
 }
 
@@ -244,11 +252,11 @@
 @keyframes tooltipFadeIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-4px);
+    transform: translateX(-50%) translateY(4px);
   }
   to {
     opacity: 1;
-    transform: translateX(-50%) translateY(-8px);
+    transform: translateX(-50%) translateY(0);
   }
 }
 
@@ -384,6 +392,10 @@
     flex: 1;
     padding: 10px 16px;
   }
+  
+  .chart-wrapper {
+    padding: 60px 0 30px; /* Reduced but still enough space for tooltip */
+  }
 
   .chart-navigation {
     gap: 8px;
@@ -405,6 +417,11 @@
   .bar-empty {
     max-width: 28px;
   }
+  
+  .bar-tooltip {
+    font-size: 12px;
+    padding: 6px 12px;
+  }
 
   .bar-day {
     font-size: 14px;
@@ -419,4 +436,7 @@
     font-size: 15px;
   }
 }
+
+
+
 

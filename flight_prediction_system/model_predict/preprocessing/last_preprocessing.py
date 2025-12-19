@@ -158,36 +158,69 @@ def process_final_step(input_file, output_file):
         print("Lỗi: Không tìm thấy file.")
         return
 
-    # 1. Chuẩn hóa ngày tháng
-    print("Đang chuẩn hóa cột flight_date...")
-    df['flight_date'] = df['flight_date'].apply(parse_date_standard)
+    print(f"Tổng số dòng trong file: {len(df):,}")
 
-    # 2. Xử lý giá (Chỉ từ dòng 102182 trở đi)
+    # 1. Chuẩn hóa ngày tháng
+    print("\n[Bước 1] Đang chuẩn hóa cột flight_date...")
+    df['flight_date'] = df['flight_date'].apply(parse_date_standard)
+    print("✓ Hoàn thành chuẩn hóa ngày tháng")
+
+    # 2. Xử lý giá với logic phân đoạn chính xác
+    # - Dòng 0 -> 102181: Giữ nguyên (đã là giá 1 người, adult=1.0)
+    # - Dòng 102182 -> 106798: Tính toán lại (giá nhiều người -> 1 người)
+    # - Dòng 106799 -> cuối: Giữ nguyên (đã là giá 1 người dù adult=2.0)
+    
     start_row_index = 102182
-    print(f"Đang tính toán lại giá từ dòng index {start_row_index}...")
+    end_row_index = 106798
+    
+    print(f"\n[Bước 2] Xử lý giá vé:")
+    print(f"  • Dòng 0 -> {start_row_index - 1}: Giữ nguyên giá gốc")
+    print(f"  • Dòng {start_row_index} -> {end_row_index}: Tính toán lại giá cho 1 người")
+    print(f"  • Dòng {end_row_index + 1} -> cuối: Giữ nguyên giá gốc")
     
     if len(df) > start_row_index:
-        # Tách phần cần xử lý để không ảnh hưởng các dòng phía trên
-        # Sử dụng .loc với điều kiện index >= start_row_index
-        mask_process = df.index >= start_row_index
+        # Tạo mask chính xác: chỉ xử lý từ dòng 102182 đến 106798
+        mask_process = (df.index >= start_row_index) & (df.index <= end_row_index)
+        num_rows_to_process = mask_process.sum()
         
-        # Áp dụng hàm tính giá
-        df.loc[mask_process, 'price'] = df.loc[mask_process].apply(recalculate_price_logic, axis=1)
+        if num_rows_to_process > 0:
+            print(f"\n⏳ Đang xử lý {num_rows_to_process:,} dòng...")
         
-        print(f"-> Đã xử lý lại giá cho {mask_process.sum()} dòng.")
+            # Áp dụng hàm tính giá CHỈ cho các dòng trong khoảng này
+            df.loc[mask_process, 'price'] = df.loc[mask_process].apply(recalculate_price_logic, axis=1)
+        
+            print(f"✓ Đã tính toán lại giá cho {num_rows_to_process:,} dòng")
+        
+        # Thống kê các phân đoạn
+        rows_before = (df.index < start_row_index).sum()
+        rows_after = (df.index > end_row_index).sum()
+        
+        print(f"\n📊 Thống kê:")
+        print(f"  • Dòng giữ nguyên (trước): {rows_before:,}")
+        print(f"  • Dòng đã tính toán lại: {num_rows_to_process:,}")
+        print(f"  • Dòng giữ nguyên (sau): {rows_after:,}")
+        print(f"  • Tổng: {len(df):,}")
     else:
-        print(f"Cảnh báo: File chỉ có {len(df)} dòng, không chạm tới dòng {start_row_index}.")
+        print(f"⚠️  Cảnh báo: File chỉ có {len(df):,} dòng, không chạm tới dòng {start_row_index}.")
 
     # 3. Xóa cột thừa
-    print("Đang xóa các cột adult, child, infant...")
+    print(f"\n[Bước 3] Đang xóa các cột adult, child, infant...")
     df.drop(columns=['adult', 'child', 'infant'], inplace=True, errors='ignore')
+    print("✓ Đã xóa các cột passenger")
 
-    # Xuất file
+    # 4. Xuất file
+    print(f"\n[Bước 4] Đang xuất file kết quả...")
     df.to_csv(output_file, index=False)
-    print("-" * 50)
-    print(f"XỬ LÝ HOÀN TẤT. File kết quả: {output_file}")
-    print("-" * 50)
+    
+    print("\n" + "=" * 60)
+    print("✅ XỬ LÝ HOÀN TẤT THÀNH CÔNG!")
+    print("=" * 60)
+    print(f"📁 File đầu vào: {input_file}")
+    print(f"📁 File kết quả: {output_file}")
+    print(f"📊 Tổng số dòng: {len(df):,}")
+    print("=" * 60)
 
 if __name__ == "__main__":
     # Đảm bảo cài đặt: pip install python-dateutil pandas
-    process_final_step('./preprocessing/filter_class_flight_price_history.csv', 'final_flight_price_history.csv')
+    # Đường dẫn tương đối: khi chạy script từ thư mục preprocessing
+    process_final_step('./filter_class_flight_price_history.csv', './final_flight_price_history.csv')

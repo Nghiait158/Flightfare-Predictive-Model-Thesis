@@ -22,7 +22,16 @@ export const formatPrice = (price) => {
  */
 export const formatDate = (date) => {
   if (!date) return '';
-  const d = new Date(date);
+  
+  // Parse date safely to avoid timezone issues
+  let d;
+  if (typeof date === 'string' && date.includes('-')) {
+    const [year, month, day] = date.split('T')[0].split('-').map(Number);
+    d = new Date(year, month - 1, day);
+  } else {
+    d = new Date(date);
+  }
+  
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
@@ -36,7 +45,16 @@ export const formatDate = (date) => {
  */
 export const formatDateForAPI = (date) => {
   if (!date) return '';
-  const d = new Date(date);
+  
+  // Parse date safely to avoid timezone issues
+  let d;
+  if (typeof date === 'string' && date.includes('-')) {
+    const [year, month, day] = date.split('T')[0].split('-').map(Number);
+    d = new Date(year, month - 1, day);
+  } else {
+    d = new Date(date);
+  }
+  
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
@@ -102,7 +120,15 @@ export const getTodayFormatted = () => {
  * @returns {Date} New date
  */
 export const addDays = (date, days) => {
-  const result = new Date(date);
+  // Parse date safely to avoid timezone issues
+  let result;
+  if (typeof date === 'string' && date.includes('-')) {
+    const [year, month, day] = date.split('T')[0].split('-').map(Number);
+    result = new Date(year, month - 1, day);
+  } else {
+    result = new Date(date);
+  }
+  
   result.setDate(result.getDate() + days);
   return result;
 };

@@ -17,6 +17,8 @@ const PriceChart = ({ fromAirport, toAirport, onSelectDate }) => {
     setError(null);
 
     try {
+      // Request 15 days forward (backend also includes 3 days back for price trends)
+      // Total display: ~18 days (3 past + 15 future)
       const response = await flightService.getPriceChartData({
         from: fromAirport,
         to: toAirport,
@@ -25,12 +27,19 @@ const PriceChart = ({ fromAirport, toAirport, onSelectDate }) => {
 
       if (response.success && response.data) {
         const prices = response.data.prices || [];
+        
+        // Log data freshness info for debugging
+        const freshCount = prices.filter(p => p.hasData && p.isFresh !== false).length;
+        const totalCount = prices.filter(p => p.hasData).length;
+        console.log(`Price Chart: ${freshCount}/${totalCount} days have fresh data (< 24h old)`);
+        
         setPriceData(prices);
         
-        // Auto-select today's date if available
-        const today = new Date().toISOString().split('T')[0];
+        // Auto-select today's date if available (use local timezone)
+        const todayObj = new Date();
+        const today = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-${String(todayObj.getDate()).padStart(2, '0')}`;
         const todayData = prices.find(p => 
-          new Date(p.date).toISOString().split('T')[0] === today && p.hasData
+          p.date === today && p.hasData
         );
         
         if (todayData) {
@@ -218,7 +227,14 @@ const PriceChart = ({ fromAirport, toAirport, onSelectDate }) => {
                     {/* Tooltip - show on hover OR when selected */}
                     {(isHovered || isSelected) && dayData.hasData && (
                       <div className="bar-tooltip">
-                        from {formatPrice(dayData.price, dayData.currency)}
+                        <div>from {formatPrice(dayData.price, dayData.currency)}</div>
+                        {dayData.hoursOld && (
+                          <div style={{ fontSize: '0.7rem', opacity: 0.8, marginTop: '2px' }}>
+                            {dayData.hoursOld < 1 
+                              ? `${Math.round(dayData.hoursOld * 60)}m ago`
+                              : `${Math.round(dayData.hoursOld)}h ago`}
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -270,4 +286,6 @@ const isWeekend = (dayOfWeek) => {
 };
 
 export default PriceChart;
+
+
 

@@ -81,17 +81,38 @@ exports.searchFlights = async (req, res) => {
     console.log(`Searching flights: dep_id=${dep_id}, arr_id=${arr_id}, departDate=${departDate}`);
     const flightResult = await db.query(flightQuery, [dep_id, arr_id, departDate]);
     console.log(`Query returned ${flightResult.rows.length} flight-class combinations`);
+    
+    // Debug: Log first few results to check freshness
+    if (flightResult.rows.length > 0) {
+      console.log(`Sample data freshness:`, flightResult.rows.slice(0, 3).map(r => ({
+        schedule: r.schedule_id,
+        class: r.class_name,
+        checked_at: r.checked_at,
+        hours_old: parseFloat(r.hours_old).toFixed(2)
+      })));
+    }
 
     // Group flights by schedule and organize by class
     const flightsMap = new Map();
 
     flightResult.rows.forEach(row => {
       const scheduleKey = row.schedule_id;
+      
+      // FIX: Convert PostgreSQL DATE to string to avoid timezone issues
+      let flightDateStr = row.flight_date;
+      if (row.flight_date instanceof Date) {
+        const year = row.flight_date.getFullYear();
+        const month = String(row.flight_date.getMonth() + 1).padStart(2, '0');
+        const day = String(row.flight_date.getDate()).padStart(2, '0');
+        flightDateStr = `${year}-${month}-${day}`;
+      } else if (typeof row.flight_date === 'string') {
+        flightDateStr = row.flight_date.split('T')[0];
+      }
 
       if (!flightsMap.has(scheduleKey)) {
         flightsMap.set(scheduleKey, {
           scheduleId: row.schedule_id,
-          flightDate: row.flight_date,
+          flightDate: flightDateStr,
           airline: {
             id: row.airline_id,
             code: row.airline_code,
@@ -126,7 +147,7 @@ exports.searchFlights = async (req, res) => {
         className: row.class_name,
         price: parseFloat(row.price),
         currency: row.currency,
-        flightDate: row.flight_date,
+        flightDate: flightDateStr,
         lastChecked: row.checked_at,
         hoursOld: parseFloat(row.hours_old)
       });
@@ -147,18 +168,32 @@ exports.searchFlights = async (req, res) => {
     let isStale = false;
 
     if (flights.length > 0) {
-      // Find the oldest data
+      // Find the NEWEST and OLDEST data to understand data freshness better
+      let newestDataAge = Infinity;
       flights.forEach(flight => {
         flight.classes.forEach(cls => {
+          if (cls.hoursOld < newestDataAge) {
+            newestDataAge = cls.hoursOld;
+          }
           if (cls.hoursOld > oldestDataAge) {
             oldestDataAge = cls.hoursOld;
-            console.log(`Found older data: ${cls.className} checked at ${cls.lastChecked} (${cls.hoursOld.toFixed(2)}h old)`);
           }
         });
       });
       
-      isStale = oldestDataAge > STALE_THRESHOLD_HOURS;
-      console.log(`Data freshness: oldest=${oldestDataAge.toFixed(2)}h, isStale=${isStale}, threshold=${STALE_THRESHOLD_HOURS}h`);
+      // Consider data FRESH if we have ANY data less than 1 hour old
+      // This prevents re-crawling when we just crawled recently
+      const hasFreshData = newestDataAge < 1;
+      
+      // Only consider stale if ALL data is old AND no fresh data exists
+      isStale = oldestDataAge > STALE_THRESHOLD_HOURS && !hasFreshData;
+      
+      console.log(`📊 Data freshness analysis:`);
+      console.log(`   Newest: ${newestDataAge.toFixed(2)}h old`);
+      console.log(`   Oldest: ${oldestDataAge.toFixed(2)}h old`);
+      console.log(`   Has fresh data (<1h): ${hasFreshData}`);
+      console.log(`   Is stale: ${isStale} (threshold: ${STALE_THRESHOLD_HOURS}h)`);
+      console.log(`   Total flights: ${flights.length}, Total classes: ${flights.reduce((sum, f) => sum + f.classes.length, 0)}`);
     }
 
     res.json({
@@ -168,6 +203,7 @@ exports.searchFlights = async (req, res) => {
         count: flights.length,
         dataFreshness: {
           oldestDataHours: Math.round(oldestDataAge * 10) / 10,
+          newestDataHours: flights.length > 0 ? Math.round(Math.min(...flights.flatMap(f => f.classes.map(c => c.hoursOld))) * 10) / 10 : 0,
           isStale: isStale,
           thresholdHours: STALE_THRESHOLD_HOURS,
           message: isStale 
@@ -228,41 +264,72 @@ exports.getNearbyDatePrices = async (req, res) => {
     const { dep_id, arr_id } = airportResult.rows[0];
     const FRESH_DATA_THRESHOLD_HOURS = 6;
 
-    // Query for minimum price per date (only fresh data)
+    // Simple query: Get cheapest price (from latest data) for each date
     const priceQuery = `
+      WITH latest_prices AS (
+        -- Step 1: Get LATEST price for each schedule+class+date
+        SELECT DISTINCT ON (fs.schedule_id, c.class_id, fp.flight_date)
+          fp.flight_date,
+          fp.price,
+          fp.checked_at,
+          EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 as hours_old
+        FROM flight_prices fp
+        INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
+        INNER JOIN new_classes c ON fp.class_id = c.class_id
+        WHERE fs.departure_airport_id = $1
+          AND fs.arrival_airport_id = $2
+          AND fp.flight_date = ANY($3)
+          AND fs.is_active = true
+          AND c.is_active = true
+          AND EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 <= $4
+        ORDER BY fs.schedule_id, c.class_id, fp.flight_date, fp.checked_at DESC
+      )
+      -- Step 2: Get MIN price for each date
       SELECT 
-        fp.flight_date,
-        MIN(fp.price) as min_price,
-        MAX(fp.checked_at) as latest_checked_at,
-        EXTRACT(EPOCH FROM (NOW() - MAX(fp.checked_at)))/3600 as hours_old
-      FROM flight_prices fp
-      INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
-      INNER JOIN new_classes c ON fp.class_id = c.class_id
-      WHERE fs.departure_airport_id = $1
-        AND fs.arrival_airport_id = $2
-        AND fp.flight_date = ANY($3)
-        AND fs.is_active = true
-        AND c.is_active = true
-        AND EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 <= $4
-      GROUP BY fp.flight_date
-      ORDER BY fp.flight_date
+        flight_date,
+        MIN(price) as min_price,
+        MAX(checked_at) as latest_checked_at,
+        AVG(hours_old) as hours_old
+      FROM latest_prices
+      GROUP BY flight_date
+      ORDER BY flight_date
     `;
 
-    console.log(`Fetching nearby date prices for dates:`, dates);
+    console.log(`\n📊 Nearby Dates - Fetching cheapest prices for ${dates.length} dates`);
     const result = await db.query(priceQuery, [dep_id, arr_id, dates, FRESH_DATA_THRESHOLD_HOURS]);
+    console.log(`   ✅ Found ${result.rows.length} dates with fresh data (< ${FRESH_DATA_THRESHOLD_HOURS}h)`);
     
     // Format response
     const pricesByDate = {};
     result.rows.forEach(row => {
-      pricesByDate[row.flight_date] = {
-        minPrice: parseFloat(row.min_price),
+      // FIX: Convert PostgreSQL DATE to string to avoid timezone issues
+      let dateStr = row.flight_date;
+      if (row.flight_date instanceof Date) {
+        const year = row.flight_date.getFullYear();
+        const month = String(row.flight_date.getMonth() + 1).padStart(2, '0');
+        const day = String(row.flight_date.getDate()).padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`;
+      } else if (typeof row.flight_date === 'string') {
+        dateStr = row.flight_date.split('T')[0];
+      }
+      
+      const minPrice = parseFloat(row.min_price);
+      const hoursOld = parseFloat(row.hours_old);
+      
+      pricesByDate[dateStr] = {
+        minPrice: minPrice,
         lastChecked: row.latest_checked_at,
-        hoursOld: parseFloat(row.hours_old),
-        isFresh: parseFloat(row.hours_old) <= FRESH_DATA_THRESHOLD_HOURS
+        hoursOld: hoursOld,
+        isFresh: hoursOld <= FRESH_DATA_THRESHOLD_HOURS
       };
+      
+      console.log(`      ${dateStr}: ${minPrice.toLocaleString()}đ (${hoursOld.toFixed(1)}h old)`);
     });
 
-    console.log(`Found prices for ${result.rows.length} dates out of ${dates.length}`);
+    const missingDates = dates.filter(d => !pricesByDate[d]);
+    if (missingDates.length > 0) {
+      console.log(`   ⚠️  No fresh data: ${missingDates.join(', ')}`);
+    }
 
     res.json({
       success: true,
@@ -343,7 +410,9 @@ exports.getCheapestTickets = async (req, res) => {
 
     // Query to find cheapest flights across available dates
     // Priority: 1. Lowest price, 2. Earliest date, 3. Direct flights
-    // Note: Searches all available dates in DB, not limited by current date
+    // IMPORTANT: Only show FRESH data (checked within last 24 hours)
+    const FRESH_DATA_THRESHOLD_HOURS = 24;
+    
     const cheapestQuery = `
       SELECT DISTINCT ON (fp.flight_date, fs.schedule_id)
         fs.schedule_id,
@@ -357,6 +426,7 @@ exports.getCheapestTickets = async (req, res) => {
         fp.flight_date,
         TO_CHAR(fp.flight_date, 'YYYY-MM-DD') as flight_date_str,
         fp.checked_at,
+        EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 as hours_old,
         EXTRACT(DOW FROM fp.flight_date) as day_of_week,
         TO_CHAR(fp.flight_date, 'Dy, Mon DD') as formatted_date
       FROM flight_prices fp
@@ -366,11 +436,13 @@ exports.getCheapestTickets = async (req, res) => {
         AND fs.arrival_airport_id = $2
         AND fs.is_active = true
         AND al.is_active = true
+        AND fp.flight_date >= CURRENT_DATE
+        AND EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 <= ${FRESH_DATA_THRESHOLD_HOURS}
       ORDER BY fp.flight_date, fs.schedule_id, fp.checked_at DESC
     `;
 
     const result = await db.query(cheapestQuery, [dep_id, arr_id]);
-    console.log(`Found ${result.rows.length} flight records from database`);
+    console.log(`Found ${result.rows.length} flight records with fresh data (< ${FRESH_DATA_THRESHOLD_HOURS}h old)`);
 
     // Group by date and find minimum price for each date
     const dateMinPrices = new Map();
@@ -426,7 +498,9 @@ exports.getCheapestTickets = async (req, res) => {
           duration: durationStr,
           flightType: 'Direct',
           airlineCode: flight.airline_code,
-          airlineName: flight.airline_name
+          airlineName: flight.airline_name,
+          hoursOld: flight.hours_old ? parseFloat(flight.hours_old) : null,
+          isFresh: flight.hours_old ? parseFloat(flight.hours_old) <= FRESH_DATA_THRESHOLD_HOURS : false
         };
       });
 
@@ -555,11 +629,16 @@ exports.getPriceChartData = async (req, res) => {
 
     const { dep_id, arr_id } = airportResult.rows[0];
 
-    // Query to get cheapest price per day for next X days
+    // Query to get cheapest price per day
+    // Include 3 days before today to show recent price trends
+    // IMPORTANT: Only show FRESH data (checked within last 24 hours)
+    const DAYS_BEFORE = 3;
+    const FRESH_DATA_THRESHOLD_HOURS = 24; // Price chart can show slightly older data than search
+    
     const priceChartQuery = `
       WITH date_range AS (
         SELECT generate_series(
-          CURRENT_DATE,
+          CURRENT_DATE - INTERVAL '${DAYS_BEFORE} days',
           CURRENT_DATE + INTERVAL '${parseInt(days)} days',
           '1 day'::interval
         )::date as date
@@ -572,14 +651,17 @@ exports.getPriceChartData = async (req, res) => {
           EXTRACT(DOW FROM fp.flight_date) as day_of_week,
           TO_CHAR(fp.flight_date, 'Day') as day_name,
           TO_CHAR(fp.flight_date, 'Mon DD') as formatted_date,
-          COUNT(DISTINCT fs.schedule_id) as flight_count
+          COUNT(DISTINCT fs.schedule_id) as flight_count,
+          MAX(fp.checked_at) as latest_checked_at,
+          EXTRACT(EPOCH FROM (NOW() - MAX(fp.checked_at)))/3600 as hours_old
         FROM flight_prices fp
         INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
         WHERE fs.departure_airport_id = $1
           AND fs.arrival_airport_id = $2
           AND fs.is_active = true
-          AND fp.flight_date >= CURRENT_DATE
+          AND fp.flight_date >= CURRENT_DATE - INTERVAL '${DAYS_BEFORE} days'
           AND fp.flight_date <= CURRENT_DATE + INTERVAL '${parseInt(days)} days'
+          AND EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 <= ${FRESH_DATA_THRESHOLD_HOURS}
         GROUP BY fp.flight_date
       )
       SELECT 
@@ -590,26 +672,47 @@ exports.getPriceChartData = async (req, res) => {
         TO_CHAR(dr.date, 'Day') as day_name,
         TO_CHAR(dr.date, 'Mon DD') as formatted_date,
         COALESCE(cpd.flight_count, 0) as flight_count,
-        CASE WHEN EXTRACT(DOW FROM dr.date) IN (0, 6) THEN true ELSE false END as is_weekend
+        CASE WHEN EXTRACT(DOW FROM dr.date) IN (0, 6) THEN true ELSE false END as is_weekend,
+        cpd.latest_checked_at,
+        cpd.hours_old
       FROM date_range dr
       LEFT JOIN cheapest_per_day cpd ON dr.date = cpd.flight_date
       ORDER BY dr.date ASC
     `;
 
     const result = await db.query(priceChartQuery, [dep_id, arr_id]);
-    console.log(`Found ${result.rows.length} days in range`);
+    console.log(`Found ${result.rows.length} days in range (fresh data only < ${FRESH_DATA_THRESHOLD_HOURS}h)`);
 
-    const priceData = result.rows.map(row => ({
-      date: row.flight_date,
-      formattedDate: row.formatted_date?.trim(),
-      dayName: row.day_name?.trim(),
-      dayOfWeek: parseInt(row.day_of_week),
-      price: row.min_price ? parseFloat(row.min_price) : null,
-      currency: row.currency,
-      flightCount: parseInt(row.flight_count),
-      isWeekend: row.is_weekend,
-      hasData: row.min_price !== null
-    }));
+    const priceData = result.rows.map(row => {
+      // FIX: Convert PostgreSQL DATE to string to avoid timezone issues
+      // PostgreSQL returns Date object which may be affected by timezone
+      let dateStr = row.flight_date;
+      if (row.flight_date instanceof Date) {
+        // Extract YYYY-MM-DD without timezone conversion
+        const year = row.flight_date.getFullYear();
+        const month = String(row.flight_date.getMonth() + 1).padStart(2, '0');
+        const day = String(row.flight_date.getDate()).padStart(2, '0');
+        dateStr = `${year}-${month}-${day}`;
+      } else if (typeof row.flight_date === 'string') {
+        // Already a string, use as-is (might be "2024-12-29" or "2024-12-29T00:00:00Z")
+        dateStr = row.flight_date.split('T')[0];
+      }
+      
+      return {
+        date: dateStr,
+        formattedDate: row.formatted_date?.trim(),
+        dayName: row.day_name?.trim(),
+        dayOfWeek: parseInt(row.day_of_week),
+        price: row.min_price ? parseFloat(row.min_price) : null,
+        currency: row.currency,
+        flightCount: parseInt(row.flight_count),
+        isWeekend: row.is_weekend,
+        hasData: row.min_price !== null,
+        latestCheckedAt: row.latest_checked_at,
+        hoursOld: row.hours_old ? parseFloat(row.hours_old) : null,
+        isFresh: row.hours_old ? parseFloat(row.hours_old) <= FRESH_DATA_THRESHOLD_HOURS : false
+      };
+    });
 
     // Calculate price statistics for available data
     const pricesWithData = priceData.filter(d => d.hasData).map(d => d.price);
@@ -749,7 +852,10 @@ exports.getPopularDestinations = async (req, res) => {
       city: row.city,
       flightCount: parseInt(row.flight_count),
       minPrice: parseFloat(row.min_price),
-      currency: row.currency || 'VND'
+      currency: row.currency || 'VND',
+      latestCheckedAt: row.latest_checked_at,
+      hoursOld: row.hours_old ? parseFloat(row.hours_old) : null,
+      isFresh: row.hours_old ? parseFloat(row.hours_old) <= FRESH_DATA_THRESHOLD_HOURS : false
     }));
 
     console.log(`✅ Found ${destinations.length} popular destinations`);

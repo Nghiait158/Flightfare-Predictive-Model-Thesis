@@ -62,6 +62,8 @@ const SearchResults = () => {
   const [dataFreshness, setDataFreshness] = useState(null);
   const [nearbyDatePrices, setNearbyDatePrices] = useState([]);
   const [loadingNearbyPrices, setLoadingNearbyPrices] = useState(false);
+  const [isNearbyDateClick, setIsNearbyDateClick] = useState(false);
+  const [searchMode, setSearchMode] = useState('normal');
 
   const itemsPerPage = 10;
 
@@ -131,7 +133,9 @@ const SearchResults = () => {
         }
 
         // Check if we got any flights
-        if (response.data.flights.length === 0 && !skipCrawl) {
+        // Skip auto-crawl if this is from nearby date click (we know there's data)
+        const shouldSkipCrawl = skipCrawl || isNearbyDateClick;
+        if (response.data.flights.length === 0 && !shouldSkipCrawl) {
           // No flights found - trigger automatic crawl
           console.log('No flights found in database, triggering automatic crawl...');
           const crawlSuccess = await crawlAndRetry();
@@ -141,12 +145,18 @@ const SearchResults = () => {
           }
           return; // Exit early if crawl failed
         }
+        
+        // Reset nearby date click flag
+        if (isNearbyDateClick) {
+          setIsNearbyDateClick(false);
+        }
 
         // Check if data is too old (> 6 hours) and auto-crawl
         // But also check if we have just crawled (to avoid re-crawling immediately)
         const AUTO_CRAWL_THRESHOLD = 6; // hours
         
         console.log(`🔍 Checking data freshness:`, {
+          newestDataHours: response.data.dataFreshness?.newestDataHours,
           oldestDataHours: response.data.dataFreshness?.oldestDataHours,
           isStale: response.data.dataFreshness?.isStale,
           threshold: AUTO_CRAWL_THRESHOLD,
@@ -154,8 +164,10 @@ const SearchResults = () => {
           flightCount: response.data.flights.length
         });
         
-        if (response.data.dataFreshness?.oldestDataHours > AUTO_CRAWL_THRESHOLD && !skipCrawl && response.data.flights.length > 0) {
-          console.log(`⚠️ Data is too old (${response.data.dataFreshness.oldestDataHours}h > ${AUTO_CRAWL_THRESHOLD}h), triggering automatic crawl...`);
+        // Backend already checks if data is truly stale (considers if ANY data is fresh)
+        // Only auto-crawl if backend says data is stale AND we haven't just crawled
+        if (response.data.dataFreshness?.isStale && !skipCrawl && response.data.flights.length > 0) {
+          console.log(`⚠️ Data is stale (newest: ${response.data.dataFreshness.newestDataHours}h, oldest: ${response.data.dataFreshness.oldestDataHours}h), triggering automatic crawl...`);
           const crawlSuccess = await crawlAndRetry();
           if (crawlSuccess) {
             // Recursively fetch again with skipCrawl = true
@@ -164,13 +176,9 @@ const SearchResults = () => {
           return; // Exit early if crawl failed
         }
 
-        // Check if data is stale (0-6 hours) - just show the data with refresh option
-        if (response.data.dataFreshness?.isStale && response.data.dataFreshness?.oldestDataHours <= AUTO_CRAWL_THRESHOLD && !skipCrawl && response.data.flights.length > 0) {
-          console.log(`✅ Data is stale but within ${AUTO_CRAWL_THRESHOLD} hours, showing data with refresh option...`);
-        }
-        
-        if (response.data.dataFreshness?.oldestDataHours <= AUTO_CRAWL_THRESHOLD) {
-          console.log(`✅ Data is fresh (${response.data.dataFreshness?.oldestDataHours}h), showing results directly`);
+        // If data is not stale, it means we have fresh data (< 1 hour)
+        if (!response.data.dataFreshness?.isStale && response.data.flights.length > 0) {
+          console.log(`✅ Data is fresh (newest: ${response.data.dataFreshness?.newestDataHours}h), showing results directly`);
         }
 
         setFlights(response.data.flights);
@@ -339,6 +347,103 @@ const SearchResults = () => {
     return result;
   }, [flights, filters, sortBy]);
 
+  // Group flights by airline with all departure times
+  const groupedFlights = useMemo(() => {
+    const grouped = new Map();
+    
+    filteredFlights.forEach(flight => {
+      const airlineCode = flight.airline.code;
+      
+      if (!grouped.has(airlineCode)) {
+        grouped.set(airlineCode, {
+          airline: flight.airline,
+          departureTimes: [],
+          minPrice: Infinity,
+          currency: 'VND'
+        });
+      }
+      
+      const group = grouped.get(airlineCode);
+      
+      // Add departure time with flight info
+      group.departureTimes.push({
+        time: flight.departure.time,
+        duration: flight.duration,
+        arrival: flight.arrival,
+        classes: flight.classes,
+        scheduleId: flight.scheduleId,
+        stops: flight.stops
+      });
+      
+      // Track minimum price
+      const flightMinPrice = Math.min(...flight.classes.map(c => c.price));
+      if (flightMinPrice < group.minPrice) {
+        group.minPrice = flightMinPrice;
+        group.currency = flight.classes[0].currency;
+      }
+    });
+    
+    // Sort departure times within each airline
+    grouped.forEach(group => {
+      group.departureTimes.sort((a, b) => {
+        const timeA = a.time.split(':').map(Number);
+        const timeB = b.time.split(':').map(Number);
+        return (timeA[0] * 60 + timeA[1]) - (timeB[0] * 60 + timeB[1]);
+      });
+    });
+    
+    // Convert to array and sort by min price
+    return Array.from(grouped.values()).sort((a, b) => a.minPrice - b.minPrice);
+  }, [filteredFlights]);
+
+  // AI-powered recommendations: Cheapest, Fastest, Optimal
+  const recommendations = useMemo(() => {
+    if (filteredFlights.length === 0) return null;
+
+    // Find cheapest flight
+    const cheapest = filteredFlights.reduce((min, flight) => {
+      const flightMinPrice = Math.min(...flight.classes.map(c => c.price));
+      const currentMinPrice = Math.min(...min.classes.map(c => c.price));
+      return flightMinPrice < currentMinPrice ? flight : min;
+    });
+
+    // Find fastest flight (shortest duration)
+    const fastest = filteredFlights.reduce((min, flight) => 
+      flight.durationMinutes < min.durationMinutes ? flight : min
+    );
+
+    // Find optimal flight (best balance: 40% price + 30% time + 30% duration)
+    const optimal = filteredFlights.reduce((best, flight) => {
+      const flightMinPrice = Math.min(...flight.classes.map(c => c.price));
+      const bestMinPrice = Math.min(...best.classes.map(c => c.price));
+      
+      // Normalize scores (0-1)
+      const priceRange = Math.max(...filteredFlights.map(f => Math.min(...f.classes.map(c => c.price)))) - 
+                        Math.min(...filteredFlights.map(f => Math.min(...f.classes.map(c => c.price))));
+      const durationRange = Math.max(...filteredFlights.map(f => f.durationMinutes)) - 
+                           Math.min(...filteredFlights.map(f => f.durationMinutes));
+      
+      const priceScore = priceRange > 0 ? 1 - (flightMinPrice - Math.min(...filteredFlights.map(f => Math.min(...f.classes.map(c => c.price))))) / priceRange : 0.5;
+      const durationScore = durationRange > 0 ? 1 - (flight.durationMinutes - Math.min(...filteredFlights.map(f => f.durationMinutes))) / durationRange : 0.5;
+      
+      // Departure time score (prefer morning/afternoon)
+      const hour = parseInt(flight.departure.time.split(':')[0]);
+      const timeScore = (hour >= 6 && hour <= 18) ? 1 : 0.5;
+      
+      const flightScore = (priceScore * 0.4) + (timeScore * 0.3) + (durationScore * 0.3);
+      
+      const bestPriceScore = priceRange > 0 ? 1 - (bestMinPrice - Math.min(...filteredFlights.map(f => Math.min(...f.classes.map(c => c.price))))) / priceRange : 0.5;
+      const bestDurationScore = durationRange > 0 ? 1 - (best.durationMinutes - Math.min(...filteredFlights.map(f => f.durationMinutes))) / durationRange : 0.5;
+      const bestHour = parseInt(best.departure.time.split(':')[0]);
+      const bestTimeScore = (bestHour >= 6 && bestHour <= 18) ? 1 : 0.5;
+      const bestScore = (bestPriceScore * 0.4) + (bestTimeScore * 0.3) + (bestDurationScore * 0.3);
+      
+      return flightScore > bestScore ? flight : best;
+    });
+
+    return { cheapest, fastest, optimal };
+  }, [filteredFlights]);
+
   // Pagination
   const totalPages = Math.ceil(filteredFlights.length / itemsPerPage);
   const paginatedFlights = filteredFlights.slice(
@@ -431,7 +536,15 @@ const SearchResults = () => {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
+    // Parse date string safely to avoid timezone issues
+    // If dateString is in YYYY-MM-DD format, parse it as local date
+    let date;
+    if (dateString && typeof dateString === 'string' && dateString.includes('-')) {
+      const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    } else {
+      date = new Date(dateString);
+    }
     return date.toLocaleDateString('vi-VN', {
       day: '2-digit',
       month: 'short',
@@ -440,7 +553,15 @@ const SearchResults = () => {
   };
 
   const formatDateShort = (dateString) => {
-    const date = new Date(dateString);
+    // Parse date string safely to avoid timezone issues
+    // If dateString is in YYYY-MM-DD format, parse it as local date
+    let date;
+    if (dateString && typeof dateString === 'string' && dateString.includes('-')) {
+      const [year, month, day] = dateString.split('T')[0].split('-').map(Number);
+      date = new Date(year, month - 1, day);
+    } else {
+      date = new Date(dateString);
+    }
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return {
@@ -453,13 +574,23 @@ const SearchResults = () => {
   // Generate nearby dates (3 days before and 3 days after)
   const generateNearbyDates = useMemo(() => {
     const dates = [];
-    const currentDate = new Date(searchParams.departDate);
+    // Parse date string safely to avoid timezone issues
+    let currentDate;
+    if (searchParams.departDate && typeof searchParams.departDate === 'string' && searchParams.departDate.includes('-')) {
+      const [year, month, day] = searchParams.departDate.split('T')[0].split('-').map(Number);
+      currentDate = new Date(year, month - 1, day);
+    } else {
+      currentDate = new Date(searchParams.departDate);
+    }
     
     for (let i = -3; i <= 3; i++) {
       const date = new Date(currentDate);
       date.setDate(currentDate.getDate() + i);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
       dates.push({
-        date: date.toISOString().split('T')[0],
+        date: `${year}-${month}-${day}`,
         isSelected: i === 0
       });
     }
@@ -479,7 +610,7 @@ const SearchResults = () => {
       setLoadingNearbyPrices(true);
 
       try {
-        // Get the current selected date price
+        // Step 1: Get cheapest price from current search results (today's selected date)
         const prices = flights.flatMap(f => f.classes.map(c => c.price));
         const selectedDatePrice = prices.length > 0 ? Math.min(...prices) : null;
 
@@ -489,7 +620,7 @@ const SearchResults = () => {
           return;
         }
 
-        // Get all dates except the selected one
+        // Step 2: Get prices for OTHER nearby dates (exclude selected date)
         const datesToFetch = generateNearbyDates
           .filter(d => !d.isSelected)
           .map(d => d.date);
@@ -504,8 +635,12 @@ const SearchResults = () => {
         if (response.success) {
           const pricesData = response.data.prices;
           
-          // Map the data with price differences (only fresh data)
+          console.log(`\n📊 Nearby Dates Comparison`);
+          console.log(`   Base (selected date): ${selectedDatePrice.toLocaleString()}đ`);
+          
+          // Step 3: Calculate price differences
           const pricesByDate = generateNearbyDates.map(dateInfo => {
+            // Selected date
             if (dateInfo.isSelected) {
               return {
                 ...dateInfo,
@@ -515,11 +650,13 @@ const SearchResults = () => {
               };
             }
 
+            // Other nearby dates
             const datePrice = pricesData[dateInfo.date];
             
-            // Only include if data is fresh
             if (datePrice && datePrice.isFresh) {
               const diff = datePrice.minPrice - selectedDatePrice;
+              console.log(`   ${dateInfo.date}: ${datePrice.minPrice.toLocaleString()}đ → ${diff >= 0 ? '+' : ''}${diff.toLocaleString()}đ`);
+              
               return {
                 ...dateInfo,
                 price: datePrice.minPrice,
@@ -529,9 +666,9 @@ const SearchResults = () => {
               };
             }
 
-            // Don't include stale data
+            // No fresh data for this date
             return null;
-          }).filter(item => item !== null); // Remove null entries (stale data)
+          }).filter(item => item !== null);
 
           setNearbyDatePrices(pricesByDate);
         }
@@ -667,33 +804,12 @@ const SearchResults = () => {
           </div>
 
           <div className="search-controls">
-            {/* <div className="view-toggle">
-              <Button
-                variant={viewMode === 'list' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-              >
-                ☰
-              </Button>
-              <Button
-                variant={viewMode === 'card' ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('card')}
-              >
-                ⊞
-              </Button>
-            </div> */}
-
             <Select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
+              value={searchMode}
+              onChange={(e) => setSearchMode(e.target.value)}
               options={[
-                { value: 'recommended', label: 'Recommended' },
-                { value: 'price-low', label: 'Price: Low to High' },
-                { value: 'price-high', label: 'Price: High to Low' },
-                { value: 'duration', label: 'Flight Duration' },
-                { value: 'departure-early', label: 'Earliest Departure' },
-                { value: 'departure-late', label: 'Latest Departure' }
+                { value: 'normal', label: 'Normal Search' },
+                { value: 'smart', label: 'Smart Search' }
               ]}
             />
           </div>
@@ -705,9 +821,9 @@ const SearchResults = () => {
                 <div className="nearby-dates__label">
                   <span className="nearby-dates__icon">📅</span>
                   <span>Prices for nearby dates</span>
-                  {nearbyDatePrices.length === 1 && !loadingNearbyPrices && (
+                  {/* {nearbyDatePrices.length === 1 && !loadingNearbyPrices && (
                     <span className="nearby-dates__info">(Only fresh data shown)</span>
-                  )}
+                  )} */}
                 </div>
                 {loadingNearbyPrices ? (
                   <div className="nearby-dates__loading">
@@ -743,6 +859,9 @@ const SearchResults = () => {
                       className={`nearby-date-item ${isSelected ? 'nearby-date-item--selected' : ''} ${priceDiff < 0 ? 'nearby-date-item--cheaper' : ''} ${priceDiff > 0 ? 'nearby-date-item--expensive' : ''}`}
                       onClick={() => {
                         if (!isSelected) {
+                          // Set flag to indicate this is a nearby date click
+                          // This prevents auto-crawl since we know this date has data
+                          setIsNearbyDateClick(true);
                           const newParams = {
                             ...searchParams,
                             departDate: dateInfo.date
@@ -786,6 +905,27 @@ const SearchResults = () => {
             <div className="filters-sidebar__count">
               <span>{filteredFlights.length} flight{filteredFlights.length !== 1 ? 's' : ''}</span>
             </div>
+
+            {/* Sort By */}
+            <div className="filter-group">
+              <h3 className="filter-group__title">Sort By</h3>
+              <div className="filter-group__content">
+                <Select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  options={[
+                    { value: 'recommended', label: 'Recommended' },
+                    { value: 'price-low', label: 'Price: Low to High' },
+                    { value: 'price-high', label: 'Price: High to Low' },
+                    { value: 'duration', label: 'Flight Duration' },
+                    { value: 'departure-early', label: 'Earliest Departure' },
+                    { value: 'departure-late', label: 'Latest Departure' }
+                  ]}
+                />
+              </div>
+            </div>
+
+            <div className="filter-divider"></div>
 
             {/* Price Range - Dual Range Slider */}
             <div className="filter-group">
@@ -892,7 +1032,7 @@ const SearchResults = () => {
               </div>
             </div>
 
-            <div className="filter-divider"></div>
+            {/* <div className="filter-divider"></div> */}
 
             {/* Duration */}
             {/* <div className="filter-group">
@@ -913,7 +1053,7 @@ const SearchResults = () => {
               </div>
             </div> */}
 
-            <div className="filter-divider"></div>
+            {/* <div className="filter-divider"></div> */}
 
             {/* Stops */}
             {/* <div className="filter-group">
@@ -935,7 +1075,7 @@ const SearchResults = () => {
             </div> */}
 
             {/* Ticket Class */}
-            {flightClasses.length > 0 && (
+            {/* {flightClasses.length > 0 && (
               <>
                 <div className="filter-divider"></div>
                 <div className="filter-group">
@@ -952,13 +1092,13 @@ const SearchResults = () => {
                   </div>
                 </div>
               </>
-            )}
+            )} */}
           </Card>
         </aside>
 
         {/* Flight List */}
         <main className="flight-list">
-          {paginatedFlights.length === 0 ? (
+          {groupedFlights.length === 0 ? (
             <Card>
               <div className="flight-list__empty">
                 <h3>No Matching Flights Found</h3>
@@ -966,8 +1106,8 @@ const SearchResults = () => {
                   <>
                     <p>No flights match your current filters.</p>
                     <Button onClick={() => setFilters({
-                      priceMin: 0,
-                      priceMax: 10000000,
+                      priceMin: actualPriceRange.min,
+                      priceMax: actualPriceRange.max,
                       airlines: [],
                       departureTime: [],
                       duration: [],
@@ -1009,49 +1149,57 @@ const SearchResults = () => {
               </div>
             </Card>
           ) : (
-            <>
-              {paginatedFlights.map((flight) => (
-                <FlightCard
-                  key={flight.scheduleId}
-                  flight={flight}
+            <div className="flights-grouped">
+              <div className="flights-grouped__header">
+                <h3>Direct flights</h3>
+                <span className="flights-grouped__count">
+                  {groupedFlights.length} airline{groupedFlights.length !== 1 ? 's' : ''} • {filteredFlights.length} flight{filteredFlights.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              {groupedFlights.map((airlineGroup) => (
+                <AirlineFlightCard
+                  key={airlineGroup.airline.code}
+                  airlineGroup={airlineGroup}
                   formatPrice={formatPrice}
                 />
               ))}
+            </div>
+          )}
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="pagination">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                  >
-                    ← Previous
-                  </Button>
-
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                    <Button
-                      key={page}
-                      variant={currentPage === page ? 'primary' : 'secondary'}
-                      size="sm"
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </Button>
-                  ))}
-
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                  >
-                    Next →
-                  </Button>
-                </div>
-              )}
-            </>
+          {/* AI-Powered Recommendations */}
+          {recommendations && filteredFlights.length > 0 && (
+            <div className="recommendations-section">
+              {/* <h3 className="recommendations-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                </svg>
+                AI Recommendations
+              </h3> */}
+              <div className="recommendations-grid">
+                <RecommendationCard
+                  type="optimal"
+                  flight={recommendations.optimal}
+                  formatPrice={formatPrice}
+                  title="Best Value"
+                  description="Optimal balance of price, time, and duration"
+                />
+                <RecommendationCard
+                  type="cheapest"
+                  flight={recommendations.cheapest}
+                  formatPrice={formatPrice}
+                  title="Cheapest"
+                  description="Lowest price available"
+                />
+                <RecommendationCard
+                  type="fastest"
+                  flight={recommendations.fastest}
+                  formatPrice={formatPrice}
+                  title="Fastest"
+                  description="Shortest flight duration"
+                />
+              </div>
+            </div>
           )}
         </main>
 
@@ -1159,74 +1307,281 @@ const SearchResults = () => {
   );
 };
 
-// Flight Card Component
-const FlightCard = ({ flight, formatPrice }) => {
-  const [selectedClass, setSelectedClass] = useState(flight.classes[0]);
+// Airline Flight Card Component - Grouped by airline
+const AirlineFlightCard = ({ airlineGroup, formatPrice }) => {
+  const [showDetails, setShowDetails] = useState(false);
+  const [selectedTime, setSelectedTime] = useState(null);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [showAnalyzeModal, setShowAnalyzeModal] = useState(false);
+  const timesScrollRef = useRef(null);
+
+  const formatTime = (time) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'pm' : 'am';
+    const hour12 = hours % 12 || 12;
+    return `${hour12}:${minutes.toString().padStart(2, '0')}${period}`;
+  };
+
+  const scrollTimes = (direction) => {
+    if (timesScrollRef.current) {
+      const scrollAmount = 200; // pixels to scroll
+      const newScrollLeft = timesScrollRef.current.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount);
+      timesScrollRef.current.scrollTo({
+        left: newScrollLeft,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   return (
-    <Card hoverable className="flight-card">
-      <div className="flight-card__header">
-        <div className="flight-card__airline">
-          <div className="airline-logo">
-            {flight.airline.code}
+    <div className="airline-flight-card">
+      <div className="airline-flight-card__main">
+        {/* Top Row: Airline Info and Price */}
+        <div className="airline-flight-card__header">
+          <div className="airline-flight-card__airline">
+            <div className="airline-logo-compact">
+              {airlineGroup.airline.code}
+            </div>
+            <div className="airline-name-compact">
+              {airlineGroup.airline.name}
+            </div>
           </div>
-          <div className="airline-info">
-            <div className="airline-name">{flight.airline.name}</div>
-          </div>
-        </div>
-        <div className="flight-card__price">
-          <div className="price-amount">{formatPrice(selectedClass.price)}</div>
-          <div className="price-label">/ passenger</div>
-        </div>
-      </div>
 
-      <div className="flight-card__route">
-        <div className="route-segment">
-          <div className="route-time">{flight.departure.time}</div>
-          <div className="route-code">{flight.departure.airport.code}</div>
-          <div className="route-city">{flight.departure.airport.city}</div>
-        </div>
-
-        <div className="route-info">
-          <div className="route-duration">{flight.duration}</div>
-          <div className="route-line"></div>
-          <div className="route-stops">
-            {flight.stops === 0 ? 'Nonstop' : `${flight.stops} stop${flight.stops > 1 ? 's' : ''}`}
+          <div className="airline-flight-card__price">
+            <span className="price-from">from</span>
+            <span className="price-value">{formatPrice(airlineGroup.minPrice)}</span>
+            <svg 
+              className="price-arrow" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2"
+            >
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
           </div>
         </div>
 
-        <div className="route-segment">
-          <div className="route-time">{flight.arrival.time}</div>
-          <div className="route-code">{flight.arrival.airport.code}</div>
-          <div className="route-city">{flight.arrival.airport.city}</div>
-        </div>
-      </div>
-
-      <div className="flight-card__classes">
-        {flight.classes.map(cls => (
-          <Badge
-            key={cls.classId}
-            variant={selectedClass.classId === cls.classId ? 'primary' : 'default'}
-            className="class-badge"
-            onClick={() => setSelectedClass(cls)}
-            style={{ cursor: 'pointer' }}
+        {/* Bottom Row: Departure Times with Scroll Buttons */}
+        <div className="airline-flight-card__times-container">
+          <button 
+            className="times-scroll-btn times-scroll-btn--left"
+            onClick={() => scrollTimes('left')}
+            aria-label="Scroll left"
           >
-            {cls.className}: {formatPrice(cls.price)}
-          </Badge>
-        ))}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6"/>
+            </svg>
+          </button>
+
+          <div className="airline-flight-card__times" ref={timesScrollRef}>
+            {airlineGroup.departureTimes.map((timeSlot, index) => (
+              <button
+                key={index}
+                className={`time-button ${selectedTime === index ? 'time-button--selected' : ''}`}
+                onClick={() => {
+                  setSelectedTime(selectedTime === index ? null : index);
+                  setShowDetails(!showDetails || selectedTime !== index);
+                }}
+              >
+                {formatTime(timeSlot.time)}
+              </button>
+            ))}
+          </div>
+
+          <button 
+            className="times-scroll-btn times-scroll-btn--right"
+            onClick={() => scrollTimes('right')}
+            aria-label="Scroll right"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 18l6-6-6-6"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <div className="flight-card__footer">
-        <div className="flight-card__badges">
-          {flight.stops === 0 && (
-            <Badge variant="info" size="sm"></Badge>
-          )}
+      {/* Expanded Details */}
+      {showDetails && selectedTime !== null && (
+        <div className="airline-flight-card__details">
+          <div className="flight-details">
+            <div className="flight-details__duration">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2v20M2 12h20"/>
+              </svg>
+              <span>{airlineGroup.departureTimes[selectedTime].duration}</span>
+            </div>
+
+            <div className="flight-details__route">
+              <span>Arrives {formatTime(airlineGroup.departureTimes[selectedTime].arrival.time)}</span>
+              <span className="separator">•</span>
+              <span>
+                {airlineGroup.departureTimes[selectedTime].stops === 0 
+                  ? 'Nonstop' 
+                  : `${airlineGroup.departureTimes[selectedTime].stops} stop(s)`
+                }
+              </span>
+            </div>
+
+            <div className="flight-details__classes">
+              {airlineGroup.departureTimes[selectedTime].classes.map((cls, idx) => (
+                <div 
+                  key={idx} 
+                  className={`class-option ${selectedClass === idx ? 'class-option--selected' : ''}`}
+                  onClick={() => setSelectedClass(idx)}
+                >
+                  <span className="class-name">{cls.className}</span>
+                  <span className="class-price">{formatPrice(cls.price)}</span>
+                </div>
+              ))}
+            </div>
+
+            <Button 
+              size="sm" 
+              variant="primary" 
+              className="details-button"
+              onClick={() => {
+                if (selectedClass !== null) {
+                  setShowAnalyzeModal(true);
+                }
+              }}
+              disabled={selectedClass === null}
+            >
+              Analyze Flight
+            </Button>
+          </div>
         </div>
-        <Button size="sm">
-          More Details
-        </Button>
+      )}
+      
+      {/* Analyze Flight Modal */}
+      {showAnalyzeModal && (
+        <div className="analyze-modal-overlay" onClick={() => setShowAnalyzeModal(false)}>
+          <div className="analyze-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="analyze-modal__header">
+              <h2>Flight Analysis</h2>
+              <button 
+                className="analyze-modal__close"
+                onClick={() => setShowAnalyzeModal(false)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="analyze-modal__content">
+              {/* Flight info summary */}
+              <div className="analyze-modal__flight-info">
+                <div className="flight-info-item">
+                  <span className="label">Airline</span>
+                  <span className="value">{airlineGroup.airline.name}</span>
+                </div>
+                <div className="flight-info-item">
+                  <span className="label">Departure</span>
+                  <span className="value">{selectedTime !== null ? formatTime(airlineGroup.departureTimes[selectedTime].time) : 'N/A'}</span>
+                </div>
+                <div className="flight-info-item">
+                  <span className="label">Class</span>
+                  <span className="value">
+                    {selectedTime !== null && selectedClass !== null 
+                      ? airlineGroup.departureTimes[selectedTime].classes[selectedClass].className
+                      : 'N/A'}
+                  </span>
+                </div>
+                <div className="flight-info-item">
+                  <span className="label">Price</span>
+                  <span className="value">
+                    {selectedTime !== null && selectedClass !== null 
+                      ? formatPrice(airlineGroup.departureTimes[selectedTime].classes[selectedClass].price)
+                      : 'N/A'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Placeholder for ML analysis */}
+              <div className="analyze-modal__placeholder">
+                <div className="placeholder-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  </svg>
+                </div>
+                <p>ML Analysis Coming Soon</p>
+                <p className="placeholder-subtitle">
+                  Price prediction and recommendation will be displayed here
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Recommendation Card Component
+const RecommendationCard = ({ type, flight, formatPrice, title, description }) => {
+  const minPrice = Math.min(...flight.classes.map(c => c.price));
+  
+  const typeConfig = {
+    optimal: {
+      icon: '',
+      gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+      badgeColor: '#8b5cf6'
+    },
+    cheapest: {
+      icon: '',
+      gradient: 'linear-gradient(135deg, #10b981, #059669)',
+      badgeColor: '#10b981'
+    },
+    fastest: {
+      icon: '',
+      gradient: 'linear-gradient(135deg, #f59e0b, #d97706)',
+      badgeColor: '#f59e0b'
+    }
+  };
+
+  const config = typeConfig[type];
+
+  return (
+    <div className="recommendation-card" style={{ background: config.gradient }}>
+      <div className="recommendation-card__header">
+        <div className="recommendation-badge">
+          <span className="recommendation-badge__icon">{config.icon}</span>
+          <span className="recommendation-badge__title">{title}</span>
+        </div>
+        <div className="recommendation-price">{formatPrice(minPrice)}</div>
       </div>
-    </Card>
+
+      <p className="recommendation-description">{description}</p>
+
+      <div className="recommendation-card__details">
+        <div className="recommendation-detail">
+          <span className="recommendation-detail__label">Airline</span>
+          <span className="recommendation-detail__value">{flight.airline.name}</span>
+        </div>
+        <div className="recommendation-detail">
+          <span className="recommendation-detail__label">Departure</span>
+          <span className="recommendation-detail__value">{flight.departure.time}</span>
+        </div>
+        <div className="recommendation-detail">
+          <span className="recommendation-detail__label">Duration</span>
+          <span className="recommendation-detail__value">{flight.duration}</span>
+        </div>
+      </div>
+
+      <Button 
+        variant="primary" 
+        size="sm" 
+        className="recommendation-button"
+        style={{ 
+          background: 'rgba(255, 255, 255, 0.2)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          color: 'white'
+        }}
+      >
+        Select Flight
+      </Button>
+    </div>
   );
 };
 

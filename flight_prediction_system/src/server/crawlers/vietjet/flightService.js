@@ -1054,11 +1054,11 @@ export async function getFlightResults(page, dateString, departure_airport, arri
                     try {
                         const dateParts = dateString.split('/');
                         if (dateParts.length === 3) {
-                            const day = parseInt(dateParts[0]);
-                            const month = parseInt(dateParts[1]) - 1;
-                            const year = parseInt(dateParts[2]);
-                            const dateObj = new Date(year, month, day);
-                            flight_date_iso = dateObj.toISOString();
+                            const day = String(dateParts[0]).padStart(2, '0');
+                            const month = String(dateParts[1]).padStart(2, '0');
+                            const year = dateParts[2];
+                            // Use plain date format (YYYY-MM-DD) without time/timezone
+                            flight_date_iso = `${year}-${month}-${day}`;
                         }
                     } catch (error) {
                         console.warn('Failed to convert dateString to ISO:', dateString);

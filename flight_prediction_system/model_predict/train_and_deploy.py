@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -5,6 +6,12 @@ tqdm.pandas()
 from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
+import sys
+import io
+
+# Fix encoding for Windows console
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
 import xgboost as xgb
 from sklearn.model_selection import train_test_split, cross_val_score
@@ -14,7 +21,6 @@ import joblib
 import json
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
-import matplotlib.pyplot as plt
 
 
 class FlightDataProcessor:
@@ -31,6 +37,8 @@ class FlightDataProcessor:
         self.route_stats = None
         self.feature_columns = None
         self.global_fallback_stats = None  # For unseen routes in validation/test
+        # Map flight_number -> type_of_plane (for inference fallback)
+        self.plane_map = None
         self._is_fitted = False
         
     def extract_airline(self, flight_number: str) -> str:
@@ -178,6 +186,22 @@ class FlightDataProcessor:
         print(f"✓ Global fallback stats: mean={self.global_fallback_stats['mean']:,.0f} VND, "
               f"std={self.global_fallback_stats['std']:,.0f} VND")
         
+        # Build plane_map from TRAINING data (flight_number -> type_of_plane)
+        if 'flight_number' in df_train.columns and 'type_of_plane' in df_train.columns:
+            print("Building plane map (flight_number -> type_of_plane) from training data...")
+            plane_ref = df_train.dropna(subset=['type_of_plane'])
+            # Use last occurrence in case of duplicates (usually consistent)
+            self.plane_map = (
+                plane_ref
+                .drop_duplicates(subset=['flight_number'], keep='last')
+                .set_index('flight_number')['type_of_plane']
+                .to_dict()
+            )
+            print(f"✓ Plane map built with {len(self.plane_map)} flight_number entries")
+        else:
+            print("⚠️ Warning: 'flight_number' or 'type_of_plane' missing in training data - plane_map not built")
+            self.plane_map = {}
+        
         print("Fitting label encoders on training data...")
         categorical_features = [
             'airline', 'departure_airport', 'arrival_airport', 
@@ -323,18 +347,11 @@ class FlightPriceModel:
         print(f"Validation samples: {len(X_val)}")
         print(f"Features: {len(X_train.columns)}\n")
         
-        # Train with both training and validation sets tracked
         self.model.fit(
             X_train, y_train,
-            eval_set=[(X_train, y_train), (X_val, y_val)],
+            eval_set=[(X_val, y_val)],
             verbose=50
         )
-        
-        # Get evaluation results for plotting
-        evals_result = self.model.evals_result()
-        
-        # Plot convergence curves
-        self._plot_convergence(evals_result)
         
         train_pred = self.model.predict(X_train)
         val_pred = self.model.predict(X_val)
@@ -373,56 +390,6 @@ class FlightPriceModel:
         print("="*60 + "\n")
         
         return metrics
-    
-    def _plot_convergence(self, evals_result: Dict) -> None:
-        """
-        Plot training and validation RMSE convergence curves.
-        
-        Args:
-            evals_result: Dictionary containing evaluation metrics from XGBoost
-        """
-        plt.figure(figsize=(12, 6))
-        
-        # Extract RMSE values
-        train_rmse = evals_result['validation_0']['rmse']
-        val_rmse = evals_result['validation_1']['rmse']
-        epochs = range(len(train_rmse))
-        
-        # Plot both curves
-        plt.plot(epochs, train_rmse, label='Training RMSE', linewidth=2, color='#2E86AB')
-        plt.plot(epochs, val_rmse, label='Validation RMSE', linewidth=2, color='#A23B72')
-        
-        # Styling
-        plt.xlabel('Iteration', fontsize=12, fontweight='bold')
-        plt.ylabel('RMSE (VND)', fontsize=12, fontweight='bold')
-        plt.title('Model Convergence: Training vs Validation RMSE', fontsize=14, fontweight='bold', pad=20)
-        plt.legend(fontsize=11, loc='upper right')
-        plt.grid(True, alpha=0.3, linestyle='--')
-        
-        # Add annotations for final values
-        final_train = train_rmse[-1]
-        final_val = val_rmse[-1]
-        plt.annotate(f'Final Train: {final_train:,.0f}', 
-                    xy=(len(epochs)-1, final_train), 
-                    xytext=(-80, -30), textcoords='offset points',
-                    bbox=dict(boxstyle='round,pad=0.5', fc='#2E86AB', alpha=0.7),
-                    color='white', fontsize=9, fontweight='bold',
-                    arrowprops=dict(arrowstyle='->', color='#2E86AB', lw=1.5))
-        plt.annotate(f'Final Val: {final_val:,.0f}', 
-                    xy=(len(epochs)-1, final_val), 
-                    xytext=(-80, 20), textcoords='offset points',
-                    bbox=dict(boxstyle='round,pad=0.5', fc='#A23B72', alpha=0.7),
-                    color='white', fontsize=9, fontweight='bold',
-                    arrowprops=dict(arrowstyle='->', color='#A23B72', lw=1.5))
-        
-        plt.tight_layout()
-        
-        # Save plot
-        output_path = Path('deployment_package') / 'convergence_plot.png'
-        output_path.parent.mkdir(exist_ok=True)
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        print(f"✓ Convergence plot saved: {output_path}\n")
-        plt.close()
     
     def get_feature_importance(self, feature_names: List[str], top_n: int = 15) -> pd.DataFrame:
         """Get top N most important features"""
@@ -498,11 +465,6 @@ class DeploymentPackage:
         feature_importance.to_csv(importance_path, index=False)
         print(f"✓ Feature importance saved: {importance_path}")
         
-        # Note: Convergence plot already saved during training
-        convergence_plot_path = self.save_dir / 'convergence_plot.png'
-        if convergence_plot_path.exists():
-            print(f"✓ Convergence plot saved: {convergence_plot_path}")
-        
         # 7. Create complete package archive
         package_path = self.save_dir / 'flight_ai_engine.pkl'
         package = {
@@ -511,7 +473,9 @@ class DeploymentPackage:
             'route_stats': processor.route_stats,
             'global_fallback_stats': processor.global_fallback_stats,
             'feature_columns': processor.feature_columns,
-            'metadata': metadata
+            'metadata': metadata,
+            # Add plane_map for inference-time type_of_plane reconstruction
+            'plane_map': processor.plane_map
         }
         joblib.dump(package, package_path)
         print(f"✓ Complete package saved: {package_path}")
@@ -545,8 +509,8 @@ def main():
     
     # ========== LOAD DATA ==========
     print("📂 Loading flight data...")
-    df = pd.read_csv('data/all_airlines_fixed.csv')
-    print(f"✓ Loaded {len(df):,} flight records")
+    df = pd.read_csv('data/all_airlines_cleaned.csv')
+    print(f"✓ Loaded {len(df):,} flight records (cleaned data)")
     print(f"✓ Columns: {list(df.columns)}")
     print(f"✓ Date range: {df['flight_date'].min()} to {df['flight_date'].max()}\n")
     

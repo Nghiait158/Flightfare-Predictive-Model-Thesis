@@ -217,9 +217,32 @@ export async function saveFlightPricesToDB(dailyResults, flightConfig, sourceTyp
                 }
                 
                 // 4. Insert flight price with flight_date
-                const flightDate = new Date(record.flight_date);
-                const dayOfWeek = flightDate.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                // Parse date carefully to avoid timezone issues
+                // If flight_date is in YYYY-MM-DD format, parse it as local date
+                let flightDate;
+                let dayOfWeek;
+                let isWeekend;
+                
+                if (record.flight_date) {
+                    if (record.flight_date.includes('T')) {
+                        // Legacy format with time (e.g., "2024-12-20T00:00:00.000Z")
+                        flightDate = new Date(record.flight_date);
+                    } else if (record.flight_date.includes('-')) {
+                        // Plain date format "YYYY-MM-DD" - parse as local date
+                        const [year, month, day] = record.flight_date.split('-').map(Number);
+                        flightDate = new Date(year, month - 1, day);
+                    } else {
+                        // Fallback: try to parse as is
+                        flightDate = new Date(record.flight_date);
+                    }
+                    dayOfWeek = flightDate.getDay();
+                    isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                } else {
+                    // No date provided, use current date
+                    flightDate = new Date();
+                    dayOfWeek = flightDate.getDay();
+                    isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                }
                 
                 const priceQuery = `
                     INSERT INTO flight_prices (

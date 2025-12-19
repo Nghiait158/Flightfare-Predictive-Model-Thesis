@@ -8,10 +8,20 @@ from typing import Dict, List, Tuple, Any
 import warnings
 warnings.filterwarnings('ignore')
 
+# Import class name mapper
+from class_mapper import normalize_class_name
+
+# Import price adjuster
+from price_adjuster import PriceAdjuster
+
 
 class FlightIntelligenceEngine:
-    def __init__(self, package_dir: str = 'deployment_package'):
+    def __init__(self, package_dir: str = 'deployment_package', enable_price_adjustment: bool = True):
         self.package_dir = Path(package_dir)
+        self.price_adjuster = PriceAdjuster()
+        self.price_adjuster.enabled = enable_price_adjustment
+        # Mapping flight_number -> type_of_plane built from training data
+        self.plane_map = {}
         self._load_package()
         
     def _load_package(self):
@@ -36,6 +46,8 @@ class FlightIntelligenceEngine:
         })
         self.feature_columns = package['feature_columns']
         self.metadata = package['metadata']
+        # Load plane_map if available (may be absent in older packages)
+        self.plane_map = package.get('plane_map', {}) or {}
         
         model_path = self.package_dir / 'xgboost_model.json'
         self.model = xgb.XGBRegressor()
@@ -71,8 +83,28 @@ class FlightIntelligenceEngine:
             return 'Unknown'
     
     def _prepare_features(self, flight_info: Dict[str, Any]) -> pd.DataFrame:
-        df = pd.DataFrame([flight_info])        
-        df['airline'] = df['flight_number'].apply(self._extract_airline)        
+        # Work on a shallow copy to avoid mutating caller's dict
+        info = dict(flight_info)
+        
+        # Try to infer type_of_plane from flight_number using training plane_map
+        flight_num = info.get('flight_number')
+        type_of_plane = info.get('type_of_plane', None)
+        if (type_of_plane is None) or (str(type_of_plane).strip() == ''):
+            if flight_num is not None and self.plane_map:
+                inferred_plane = self.plane_map.get(str(flight_num).strip())
+                if inferred_plane:
+                    info['type_of_plane'] = inferred_plane
+        
+        df = pd.DataFrame([info])        
+        df['airline'] = df['flight_number'].apply(self._extract_airline)
+        
+        # Normalize class name based on airline
+        if 'classes' in df.columns and len(df) > 0:
+            airline = df['airline'].iloc[0]
+            original_class = df['classes'].iloc[0]
+            normalized_class = normalize_class_name(airline, original_class)
+            df['classes'] = normalized_class
+        
         df['departure_time_bucket'] = df['departure_time'].apply(self._get_time_bucket)
         df['arrival_time_bucket'] = df.get('arrival_time', pd.Series(['Unknown'])).apply(self._get_time_bucket)        
         df['flight_date'] = pd.to_datetime(df['flight_date'], format='mixed', errors='coerce')
@@ -105,17 +137,23 @@ class FlightIntelligenceEngine:
                 df[stat_name] = df[stat_name].fillna(stat_value)
         
         for col, encoder in self.encoders.items():
-            if col in df.columns:
-                df[col] = df[col].astype('object')
-                df[col] = df[col].fillna('UNKNOWN')
-                
-                def safe_encode(x):
-                    if x in encoder.classes_:
-                        return encoder.transform([x])[0]
-                    else:
-                        return -1
-                
-                df[f'{col}_encoded'] = df[col].astype(str).apply(safe_encode)
+            # If column is missing, set default value to 'UNKNOWN'
+            if col not in df.columns:
+                df[col] = 'UNKNOWN'
+            
+            df[col] = df[col].astype('object')
+            # Replace NaN and empty strings with 'UNKNOWN'
+            df[col] = df[col].fillna('UNKNOWN')
+            df[col] = df[col].replace('', 'UNKNOWN')
+            df[col] = df[col].replace(r'^\s*$', 'UNKNOWN', regex=True)  # Also handle whitespace-only strings
+            
+            def safe_encode(x):
+                if x in encoder.classes_:
+                    return encoder.transform([x])[0]
+                else:
+                    return -1
+            
+            df[f'{col}_encoded'] = df[col].astype(str).apply(safe_encode)
         
         for col in self.feature_columns:
             if col not in df.columns:
@@ -126,8 +164,22 @@ class FlightIntelligenceEngine:
     def predict_price(self, flight_info: Dict[str, Any]) -> float:
      
         X = self._prepare_features(flight_info)
-        prediction = self.model.predict(X)[0]
-        return max(0, prediction)  
+        base_prediction = self.model.predict(X)[0]
+        base_prediction = max(0, base_prediction)
+        
+        # Apply price adjustment if enabled
+        if self.price_adjuster.enabled:
+            airline = flight_info.get('airline') or self._extract_airline(flight_info.get('flight_number', ''))
+            adjustment_result = self.price_adjuster.adjust_prediction(
+                base_prediction=base_prediction,
+                airline=airline,
+                flight_class=flight_info.get('classes', 'Eco'),
+                flight_date=flight_info.get('flight_date', ''),
+                days_to_flight=flight_info.get('days_to_flight', 30)
+            )
+            return max(0, adjustment_result['adjusted_price'])
+        
+        return base_prediction  
     
     def classify_price(self, predicted_price: float, route: str, 
                        airline: str, flight_class: str) -> Dict[str, Any]:
@@ -299,17 +351,50 @@ class FlightIntelligenceEngine:
     
     def find_optimal_booking_time(self, flight_info: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Simulate predictions for different booking windows to find optimal time.
+        Dự đoán giá từ HIỆN TẠI đến ngày bay để tìm thời điểm tốt nhất.
         
-        Tests: 90, 60, 45, 30, 21, 14, 7, 3 days before flight
+        Tests từ days_to_flight hiện tại giảm dần đến 1 ngày trước bay
         
         Returns:
             Dict with optimal day and price trajectory
         """
         flight_date = pd.to_datetime(flight_info['flight_date'])
-        test_days = [90, 60, 45, 30, 21, 14, 7, 3]
+        current_days = flight_info['days_to_flight']
+        
+        # Nếu quá gần ngày bay (< 3 ngày), không đủ dữ liệu để phân tích
+        if current_days < 3:
+            return {
+                'optimal_days': None,
+                'error': 'Too close to departure date',
+                'message': 'Chuyến bay quá gần, nên đặt ngay!'
+            }
+        
+        # Tạo các mốc test từ hiện tại đến ngày bay
+        # Test theo interval phù hợp với số ngày còn lại
+        if current_days <= 14:
+            # Gần ngày bay: test mỗi 2 ngày
+            test_days = list(range(current_days, 0, -2))
+        elif current_days <= 30:
+            # 2-4 tuần: test mỗi 3 ngày
+            test_days = list(range(current_days, 0, -3))
+        elif current_days <= 60:
+            # 1-2 tháng: test mỗi 5 ngày
+            test_days = list(range(current_days, 0, -5))
+        else:
+            # > 2 tháng: test mỗi 7 ngày
+            test_days = list(range(current_days, 0, -7))
+        
+        # Đảm bảo có ít nhất 3-4 điểm test
+        if len(test_days) < 4:
+            step = max(1, current_days // 4)
+            test_days = list(range(current_days, 0, -step))
+        
+        # Luôn thêm ngày cuối (1 ngày trước bay) để so sánh last-minute
+        if test_days[-1] != 1:
+            test_days.append(1)
         
         predictions = []
+        today = datetime.now().date()
         
         for days in test_days:
             test_info = flight_info.copy()
@@ -317,12 +402,15 @@ class FlightIntelligenceEngine:
             
             try:
                 price = self.predict_price(test_info)
+                booking_date = today + timedelta(days=(current_days - days))
+                
                 predictions.append({
                     'days_to_flight': days,
-                    'booking_date': (flight_date - timedelta(days=days)).strftime('%Y-%m-%d'),
+                    'days_from_now': current_days - days,
+                    'booking_date': booking_date.strftime('%Y-%m-%d'),
                     'predicted_price': price
                 })
-            except:
+            except Exception as e:
                 continue
         
         if not predictions:
@@ -331,25 +419,40 @@ class FlightIntelligenceEngine:
                 'error': 'Unable to calculate optimal booking time'
             }
         
-        # Find minimum price point
+        # Find minimum price point (giá rẻ nhất)
         df_pred = pd.DataFrame(predictions)
         optimal_idx = df_pred['predicted_price'].idxmin()
         optimal = df_pred.iloc[optimal_idx]
         
-        # Calculate potential savings
-        current_price = predictions[0]['predicted_price']  # Assuming first is furthest
-        max_price = df_pred['predicted_price'].max()
-        savings_vs_max = max_price - optimal['predicted_price']
+        # Giá hiện tại (nếu đặt hôm nay)
+        current_prediction = df_pred.iloc[0]
+        current_price = current_prediction['predicted_price']
+        
+        # Tính tiết kiệm so với hiện tại
+        savings_vs_now = current_price - optimal['predicted_price']
+        savings_percent = (savings_vs_now / current_price * 100) if current_price > 0 else 0
+        
+        # Xác định recommendation
+        if optimal['days_from_now'] == 0:
+            recommendation = "🎯 Đặt NGAY HÔM NAY! Đây là thời điểm tốt nhất."
+        elif optimal['days_from_now'] <= 3:
+            recommendation = f"⏰ Đợi thêm {optimal['days_from_now']} ngày nữa để có giá tốt nhất"
+        elif savings_percent < 3:
+            recommendation = f"💡 Giá khá ổn định, đặt bất cứ lúc nào cũng được (tiết kiệm tối đa ~{savings_percent:.1f}%)"
+        else:
+            recommendation = f"⏳ Nên đợi đến {optimal['booking_date']} để tiết kiệm {savings_vs_now:,.0f} VND ({savings_percent:.1f}%)"
         
         return {
             'optimal_days': int(optimal['days_to_flight']),
             'optimal_date': optimal['booking_date'],
+            'days_from_now': int(optimal['days_from_now']),
             'optimal_price': optimal['predicted_price'],
             'current_price': current_price,
-            'potential_savings': savings_vs_max,
-            'savings_percent': f'{(savings_vs_max / max_price * 100):.1f}%',
+            'savings_vs_now': savings_vs_now,
+            'savings_percent': f'{savings_percent:.1f}%',
             'price_trajectory': predictions,
-            'recommendation': f"Book around {optimal['days_to_flight']} days before departure for best price"
+            'recommendation': recommendation,
+            'is_good_time_now': optimal['days_from_now'] <= 1  # Có nên đặt ngay không?
         }
     
     def assess_volatility(self, route: str, airline: str, flight_class: str) -> Dict[str, Any]:
@@ -495,13 +598,13 @@ def example_usage():
     
     # Example query: User wants to fly SGN → HAN on 2025-12-20
     user_query = {
-        'flight_number': 'VJ123',  # Vietnam Jet Air
+        'flight_number': 'VJ156',  # Vietnam Jet Air
         'departure_airport': 'SGN',
         'arrival_airport': 'HAN',
         'flight_date': '2025-12-20',
         'departure_time': '06:00',
-        'classes': 'Eco',
-        'days_to_flight': 45,  # Booking 45 days in advance
+        'classes': 'economy',
+        'days_to_flight': 2,  # Booking 45 days in advance
         'type_of_plane': 'Airbus A321'
     }
     
@@ -511,14 +614,14 @@ def example_usage():
     print(" Example 2: Quick Price Check")
     print("-" * 40)
     quick_query = {
-        'flight_number': 'VN456',
-        'departure_airport': 'HAN',
-        'arrival_airport': 'SGN',
-        'flight_date': '2026-01-15',
-        'departure_time': '14:30',
-        'classes': 'Business',
-        'days_to_flight': 30,
-        'type_of_plane': 'Boeing 787'
+        'flight_number': 'VJ156',
+        'departure_airport': 'SGN',
+        'arrival_airport': 'HAN',
+        'flight_date': '2025-12-20',
+        'departure_time': '18:00',
+        'classes': 'economy',
+        'days_to_flight': 2,
+        'type_of_plane': 'Airbus A321'
     }
     
     price = engine.predict_price(quick_query)

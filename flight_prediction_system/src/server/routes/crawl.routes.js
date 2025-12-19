@@ -30,27 +30,41 @@ function parseDateFromFormat(dateStr) {
         throw new Error(`Invalid date format: ${dateStr}. Expected DDMMYYYY format`);
     }
     const day = parseInt(dateStr.substring(0, 2), 10);
-    const month = parseInt(dateStr.substring(2, 4), 10) - 1; // Month is 0-indexed
+    const month = parseInt(dateStr.substring(2, 4), 10);
     const year = parseInt(dateStr.substring(4, 8), 10);
-    return new Date(year, month, day);
+    // Return date string in YYYY-MM-DD format to avoid timezone issues
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
 
-function formatDateToString(date) {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear());
-    return `${day}${month}${year}`;
+function formatDateToString(dateStr) {
+    // If input is already a string in YYYY-MM-DD format, convert to DDMMYYYY
+    if (typeof dateStr === 'string' && dateStr.includes('-')) {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}${month}${year}`;
+    }
+    // If input is a Date object (legacy support)
+    if (dateStr instanceof Date) {
+        const day = String(dateStr.getDate()).padStart(2, '0');
+        const month = String(dateStr.getMonth() + 1).padStart(2, '0');
+        const year = String(dateStr.getFullYear());
+        return `${day}${month}${year}`;
+    }
+    return dateStr;
 }
 
 function generateDateRange(startDateStr, days) {
-    const startDate = parseDateFromFormat(startDateStr);
+    const startDateFormatted = parseDateFromFormat(startDateStr); // Returns YYYY-MM-DD string
+    const [year, month, day] = startDateFormatted.split('-').map(Number);
     const dates = [];
     
     for (let i = 0; i < days; i++) {
-        const currentDate = new Date(startDate);
-        currentDate.setDate(startDate.getDate() + i);
-        dates.push(formatDateToString(currentDate));
+        // Use Date object only for date arithmetic, not for storage
+        const currentDate = new Date(year, month - 1, day + i);
+        const y = currentDate.getFullYear();
+        const m = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const d = String(currentDate.getDate()).padStart(2, '0');
+        dates.push(`${d}${m}${y}`);
     }
     
     return dates;

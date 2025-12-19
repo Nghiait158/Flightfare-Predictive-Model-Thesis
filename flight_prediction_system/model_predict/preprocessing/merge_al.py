@@ -4,10 +4,10 @@ import os
 def merge_airline_files(output_file):
     # Danh sách file cần nối
     airline_files = [
-        "./data/VJ_flight_data.csv",
-        "./data/VN_flight_data.csv",
-        "./data/QH_flight_data.csv",
-        "./data/VU_flight_data.csv"
+        "./data/VJ_flight_data1.csv",
+        "./data/VN_flight_data1.csv",
+        "./data/QH_flight_data1.csv",
+        "./data/VU_flight_data1.csv"
     ]
 
     dataframes = []

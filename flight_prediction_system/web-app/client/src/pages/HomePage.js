@@ -11,8 +11,6 @@ const HomePage = () => {
 
   // Handle search form submission
   const handleSearch = (formData) => {
-    console.log('🔍 Form data received:', formData);
-    
     // Transform form data to match API expectations
     const searchParams = {
       from: formData.from,
@@ -24,8 +22,6 @@ const HomePage = () => {
       children: formData.passengers?.child || 0,
       infants: formData.passengers?.infant || 0
     };
-    
-    console.log('Transformed search params:', searchParams);
     
     // Navigate to search results page with search params
     navigate('/search-results', {

@@ -142,8 +142,23 @@ export async function saveFlightPricesToDB(dailyResults, flightConfig, sourceTyp
                 
                 if (existingSchedule.rows.length > 0) {
                     scheduleId = existingSchedule.rows[0].schedule_id;
+
+                    // Update flight_number and type_of_plane if not set yet
+                    if (record.flight_number || record.type_of_plane) {
+                        const updateScheduleQuery = `
+                            UPDATE flight_schedules
+                            SET flight_number = COALESCE(flight_number, $1),
+                                type_of_plane = COALESCE(type_of_plane, $2)
+                            WHERE schedule_id = $3
+                        `;
+                        await client.query(updateScheduleQuery, [
+                            record.flight_number || null,
+                            record.type_of_plane || null,
+                            scheduleId
+                        ]);
+                    }
                 } else {
-                    // Insert new schedule
+                    // Insert new schedule WITH FLIGHT NUMBER
                     const insertScheduleQuery = `
                         INSERT INTO flight_schedules (
                             airline_id,
@@ -151,9 +166,11 @@ export async function saveFlightPricesToDB(dailyResults, flightConfig, sourceTyp
                             arrival_airport_id,
                             departure_time,
                             duration_minutes,
+                            flight_number,
+                            type_of_plane,
                             is_active
                         )
-                        VALUES ($1, $2, $3, $4::time, $5, true)
+                        VALUES ($1, $2, $3, $4::time, $5, $6, $7, true)
                         RETURNING schedule_id
                     `;
                     try {
@@ -162,7 +179,9 @@ export async function saveFlightPricesToDB(dailyResults, flightConfig, sourceTyp
                             airportCheck.rows[0].dep_id,
                             airportCheck.rows[0].arr_id,
                             record.departure_time,
-                            duration
+                            duration,
+                            record.flight_number || null,  // SAVE flight_number
+                            record.type_of_plane || null   // SAVE aircraft type
                         ]);
                         scheduleId = scheduleResult.rows[0].schedule_id;
                     } catch (insertError) {

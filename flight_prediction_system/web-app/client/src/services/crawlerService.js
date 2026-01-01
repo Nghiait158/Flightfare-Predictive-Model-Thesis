@@ -48,8 +48,6 @@ const crawlerService = {
         save_in_db: true // Save crawled results to database
       };
 
-      console.log('🚀 Crawling from BayDep with params:', payload);
-
       const response = await axios.post(`${CRAWLER_API_URL}/baydep`, payload, {
         timeout: 300000 // 5 minutes timeout for crawling (crawl can take 2-3 minutes)
       });
@@ -95,8 +93,6 @@ const crawlerService = {
         save_in_db: true // Save crawled results to database
       };
 
-      console.log('🚀 Crawling from VietJet with params:', payload);
-
       const response = await axios.post(`${CRAWLER_API_URL}/vietjet`, payload, {
         timeout: 300000 // 5 minutes timeout for crawling (crawl can take 2-3 minutes)
       });
@@ -117,19 +113,15 @@ const crawlerService = {
    * @returns {Promise} Crawl results
    */
   smartCrawl: async (params) => {
-    console.log('🔍 Starting crawl from BayDep...');
-
     // Crawl from BayDep (aggregates multiple airlines)
     try {
       const result = await crawlerService.crawlFromBayDep(params);
       if (result.success) {
-        console.log('✅ Successfully crawled from BayDep');
         return result;
       } else {
         throw new Error('BayDep crawl returned unsuccessful result');
       }
     } catch (error) {
-      console.error('❌ BayDep crawl failed:', error.message);
       throw new Error(`Failed to crawl flight data from BayDep: ${error.message}`);
     }
   }

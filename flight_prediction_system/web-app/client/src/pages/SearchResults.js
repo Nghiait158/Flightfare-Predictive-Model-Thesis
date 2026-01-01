@@ -4,14 +4,34 @@ import './SearchResults.css';
 import Header from '../components/layout/header';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
-import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
 import Select from '../components/common/Select';
 import Checkbox from '../components/common/Checkbox';
 import EditSearchForm from '../components/form/EditSearchForm';
 import flightService from '../services/flightService';
 import crawlerService from '../services/crawlerService';
+import MLAnalysisModal from '../components/common/MLAnalysisModal';
+import EmailSubscriptionModal from '../components/common/EmailSubscriptionModal';
 
+// Helper function to normalize time format
+const normalizeTimeFormat = (timeStr) => {
+  if (!timeStr) return '';
+
+  // Remove any existing seconds
+  const timeParts = timeStr.split(':');
+
+  // If already has format HH:MM, return as is
+  if (timeParts.length === 2) {
+    return timeStr;
+  }
+
+  // If has seconds (HH:MM:SS), remove them
+  if (timeParts.length === 3) {
+    return `${timeParts[0]}:${timeParts[1]}`;
+  }
+
+  return timeStr;
+};
 
 const SearchResults = () => {
   const location = useLocation();
@@ -47,17 +67,20 @@ const SearchResults = () => {
   });
 
   // Actual price range from flight data (for slider bounds)
+  // eslint-disable-next-line no-unused-vars
   const [actualPriceRange, setActualPriceRange] = useState({
     min: 0,
     max: 10000000
   });
 
   const [sortBy, setSortBy] = useState('recommended');
+  // eslint-disable-next-line no-unused-vars
   const [viewMode, setViewMode] = useState('list');
   const [showEditModal, setShowEditModal] = useState(false);
   const [modalData, setModalData] = useState(initialSearchParams);
   const [currentPage, setCurrentPage] = useState(1);
   const [airlines, setAirlines] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [flightClasses, setFlightClasses] = useState([]);
   const [dataFreshness, setDataFreshness] = useState(null);
   const [nearbyDatePrices, setNearbyDatePrices] = useState([]);
@@ -218,6 +241,7 @@ const SearchResults = () => {
     } finally {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crawlAndRetry, searchParams]);
 
   const fetchAirlines = useCallback(async () => {
@@ -372,7 +396,9 @@ const SearchResults = () => {
         arrival: flight.arrival,
         classes: flight.classes,
         scheduleId: flight.scheduleId,
-        stops: flight.stops
+        stops: flight.stops,
+        aircraft: flight.aircraft || flight.planeType || '',  // Include aircraft type
+        flightNumber: flight.flightNumber || flight.scheduleId  // Include actual flight number
       });
       
       // Track minimum price
@@ -445,7 +471,9 @@ const SearchResults = () => {
   }, [filteredFlights]);
 
   // Pagination
+  // eslint-disable-next-line no-unused-vars
   const totalPages = Math.ceil(filteredFlights.length / itemsPerPage);
+  // eslint-disable-next-line no-unused-vars
   const paginatedFlights = filteredFlights.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
@@ -1162,6 +1190,7 @@ const SearchResults = () => {
                   key={airlineGroup.airline.code}
                   airlineGroup={airlineGroup}
                   formatPrice={formatPrice}
+                  searchParams={searchParams}
                 />
               ))}
             </div>
@@ -1308,11 +1337,14 @@ const SearchResults = () => {
 };
 
 // Airline Flight Card Component - Grouped by airline
-const AirlineFlightCard = ({ airlineGroup, formatPrice }) => {
+const AirlineFlightCard = ({ airlineGroup, formatPrice, searchParams }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [selectedTime, setSelectedTime] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
   const [showAnalyzeModal, setShowAnalyzeModal] = useState(false);
+  const [mlFlightData, setMlFlightData] = useState(null);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailSubscriptionData, setEmailSubscriptionData] = useState(null);
   const timesScrollRef = useRef(null);
 
   const formatTime = (time) => {
@@ -1428,7 +1460,12 @@ const AirlineFlightCard = ({ airlineGroup, formatPrice }) => {
                 <div 
                   key={idx} 
                   className={`class-option ${selectedClass === idx ? 'class-option--selected' : ''}`}
-                  onClick={() => setSelectedClass(idx)}
+                  onClick={() => {
+                    console.log('📦 Class clicked:', idx, cls.className);
+                    console.log('Current selectedClass:', selectedClass);
+                    setSelectedClass(idx);
+                    console.log('After setSelectedClass, selectedClass should be:', idx);
+                  }}
                 >
                   <span className="class-name">{cls.className}</span>
                   <span className="class-price">{formatPrice(cls.price)}</span>
@@ -1436,84 +1473,156 @@ const AirlineFlightCard = ({ airlineGroup, formatPrice }) => {
               ))}
             </div>
 
-            <Button 
-              size="sm" 
-              variant="primary" 
+            <Button
+              size="sm"
+              variant="primary"
               className="details-button"
-              onClick={() => {
-                if (selectedClass !== null) {
+              onClick={(e) => {
+                // Test log đơn giản nhất - nếu không thấy log này nghĩa là onClick không chạy
+                console.log('BUTTON CLICKED!!!');
+                console.log('Event:', e);
+                console.log('Selected Class:', selectedClass);
+                console.log('Selected Time:', selectedTime);
+                console.log('Button Disabled?', selectedClass === null);
+                
+                // Log ngay đầu hàm để đảm bảo onClick được trigger
+                console.log('🔘 BUTTON CLICKED - Analyze Flight button pressed');
+                console.log('Selected Class:', selectedClass);
+                console.log('Selected Time:', selectedTime);
+                console.log('Button Disabled?', selectedClass === null);
+                
+                if (selectedClass !== null && selectedTime !== null) {
+                  console.log('✅ Conditions met, proceeding with data preparation...');
+
+                  const timeSlot = airlineGroup.departureTimes[selectedTime];
+                  const classInfo = timeSlot.classes[selectedClass];
+
+                  // Prepare flight data for ML API
+                  // FIXED: Get actual data from selected flight
+
+                  // Normalize times to HH:MM format (remove seconds if present)
+                  const departureTime = normalizeTimeFormat(timeSlot.time);
+                  const arrivalTime = normalizeTimeFormat(timeSlot.arrival?.time || '');
+
+                  // Get flight number - ensure it's a string, not a number
+                  let flightNumber = '';
+                  if (timeSlot.flightNumber) {
+                    flightNumber = String(timeSlot.flightNumber);
+                  } else if (timeSlot.scheduleId) {
+                    flightNumber = String(timeSlot.scheduleId);
+                  } else {
+                    // Fallback: create from airline code
+                    flightNumber = `${airlineGroup.airline.code}${String(selectedTime).padStart(3, '0')}`;
+                  }
+
+                  const flightData = {
+                    flight_number: flightNumber,  // Ensure string flight number
+                    departure_airport: searchParams.from,
+                    arrival_airport: searchParams.to,
+                    flight_date: searchParams.departDate,
+                    departure_time: departureTime,  // Normalized to HH:MM format
+                    arrival_time: arrivalTime,  // Normalized to HH:MM format
+                    classes: classInfo.className,  // Actual class name from selection
+                    current_price: classInfo.price,  // FIXED: Get actual price from selected class
+                    type_of_plane: timeSlot.aircraft || ''  // Get aircraft type if available
+                  };
+
+                  // Log data being sent to ML API
+                  console.log('========================================');
+                  console.log('📤 SENDING DATA TO ML API');
+                  console.log('========================================');
+                  console.log('🔍 DEBUG - Raw Data Sources:');
+                  console.log('  timeSlot.flightNumber:', timeSlot.flightNumber, '(type:', typeof timeSlot.flightNumber + ')');
+                  console.log('  timeSlot.scheduleId:', timeSlot.scheduleId, '(type:', typeof timeSlot.scheduleId + ')');
+                  console.log('  timeSlot.time (raw):', timeSlot.time);
+                  console.log('  timeSlot.arrival.time (raw):', timeSlot.arrival?.time);
+                  console.log('  classInfo.className:', classInfo.className);
+                  console.log('  classInfo.price:', classInfo.price);
+                  console.log('  timeSlot.aircraft:', timeSlot.aircraft);
+                  console.log('\n📦 Processed Flight Data:');
+                  console.log('Flight Data Object:', flightData);
+                  console.log('  Flight Number:', flightData.flight_number, '(type:', typeof flightData.flight_number + ')');
+                  console.log('  Route:', `${flightData.departure_airport} → ${flightData.arrival_airport}`);
+                  console.log('  Flight Date:', flightData.flight_date);
+                  console.log('  Departure Time:', flightData.departure_time, '(normalized)');
+                  console.log('  Arrival Time:', flightData.arrival_time, '(normalized)');
+                  console.log('  Class:', flightData.classes);
+                  console.log('  Current Price:', flightData.current_price, 'VND');
+                  console.log('  Type of Plane:', flightData.type_of_plane || '(empty)');
+                  console.log('\n📋 Full JSON to be sent:');
+                  console.log(JSON.stringify(flightData, null, 2));
+                  console.log('========================================');
+
+                  setMlFlightData(flightData);
                   setShowAnalyzeModal(true);
+                  
+                  console.log('✅ State updated: mlFlightData set, showAnalyzeModal = true');
+                } else {
+                  console.warn('⚠️ Button clicked but conditions not met:');
+                  console.warn('  - selectedClass:', selectedClass);
+                  console.warn('  - selectedTime:', selectedTime);
+                  console.warn('  - Both must be non-null to proceed');
                 }
               }}
               disabled={selectedClass === null}
             >
-              Analyze Flight
+              Analyze Flight {selectedClass === null ? '(Select a class first)' : ''}
+            </Button>
+
+            <Button
+              variant="secondary"
+              onClick={() => {
+                console.log('📧 Email button clicked');
+                console.log('Selected class index:', selectedClass);
+                console.log('Selected time index:', selectedTime);
+                console.log('Search params:', searchParams);
+
+                // selectedClass is an index, we need to get the actual class name
+                if (selectedClass !== null && selectedClass !== undefined && selectedTime !== null) {
+                  const selectedTimeSlot = airlineGroup.departureTimes[selectedTime];
+
+                  if (selectedTimeSlot && selectedTimeSlot.classes && selectedTimeSlot.classes[selectedClass]) {
+                    const actualClassName = selectedTimeSlot.classes[selectedClass].className;
+
+                    const subscriptionData = {
+                      departureCode: searchParams.from,
+                      arrivalCode: searchParams.to,
+                      departureDate: searchParams.departDate,
+                      className: actualClassName  // Now we have the actual class name (e.g., "Eco", "Deluxe")
+                    };
+
+                    console.log('Opening email modal with data:', subscriptionData);
+                    setEmailSubscriptionData(subscriptionData);
+                    setShowEmailModal(true);
+                  } else {
+                    console.error('Could not find class data');
+                  }
+                } else {
+                  console.warn('Please select both time and class first');
+                }
+              }}
+              disabled={selectedClass === null || selectedTime === null}
+            >
+              📧 Nhận thông báo {(selectedClass === null || selectedTime === null) ? '(Select time & class first)' : ''}
             </Button>
           </div>
         </div>
       )}
-      
-      {/* Analyze Flight Modal */}
-      {showAnalyzeModal && (
-        <div className="analyze-modal-overlay" onClick={() => setShowAnalyzeModal(false)}>
-          <div className="analyze-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="analyze-modal__header">
-              <h2>Flight Analysis</h2>
-              <button 
-                className="analyze-modal__close"
-                onClick={() => setShowAnalyzeModal(false)}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 6L6 18M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-            
-            <div className="analyze-modal__content">
-              {/* Flight info summary */}
-              <div className="analyze-modal__flight-info">
-                <div className="flight-info-item">
-                  <span className="label">Airline</span>
-                  <span className="value">{airlineGroup.airline.name}</span>
-                </div>
-                <div className="flight-info-item">
-                  <span className="label">Departure</span>
-                  <span className="value">{selectedTime !== null ? formatTime(airlineGroup.departureTimes[selectedTime].time) : 'N/A'}</span>
-                </div>
-                <div className="flight-info-item">
-                  <span className="label">Class</span>
-                  <span className="value">
-                    {selectedTime !== null && selectedClass !== null 
-                      ? airlineGroup.departureTimes[selectedTime].classes[selectedClass].className
-                      : 'N/A'}
-                  </span>
-                </div>
-                <div className="flight-info-item">
-                  <span className="label">Price</span>
-                  <span className="value">
-                    {selectedTime !== null && selectedClass !== null 
-                      ? formatPrice(airlineGroup.departureTimes[selectedTime].classes[selectedClass].price)
-                      : 'N/A'}
-                  </span>
-                </div>
-              </div>
-              
-              {/* Placeholder for ML analysis */}
-              <div className="analyze-modal__placeholder">
-                <div className="placeholder-icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                  </svg>
-                </div>
-                <p>ML Analysis Coming Soon</p>
-                <p className="placeholder-subtitle">
-                  Price prediction and recommendation will be displayed here
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
+      {/* ML Analysis Modal */}
+      <MLAnalysisModal
+        isOpen={showAnalyzeModal}
+        onClose={() => setShowAnalyzeModal(false)}
+        flightData={mlFlightData}
+        searchParams={searchParams}
+      />
+
+      {/* Email Subscription Modal */}
+      <EmailSubscriptionModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        flightData={emailSubscriptionData}
+      />
     </div>
   );
 };

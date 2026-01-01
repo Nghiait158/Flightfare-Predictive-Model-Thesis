@@ -1,0 +1,21 @@
+# ML Prediction API Requirements
+
+# Web Framework
+Flask==3.0.0
+flask-cors==4.0.0
+Werkzeug==3.0.1
+
+# Machine Learning
+xgboost==2.0.3
+scikit-learn==1.3.2
+pandas==2.1.4
+numpy==1.26.2
+
+# Data Processing
+pyarrow==14.0.1  # For Parquet files
+joblib==1.3.2
+
+# Utilities
+python-dateutil==2.8.2
+requests==2.31.0  # For testing API
+tqdm==4.67.1  # Progress bars

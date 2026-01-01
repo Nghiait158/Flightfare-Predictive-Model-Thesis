@@ -327,7 +327,7 @@ class FlightPriceModel:
                      
         params = {
             'objective': 'reg:squarederror',
-            'max_depth': 8,
+            'max_depth': 8,  
             'learning_rate': 0.05,
             'n_estimators': 500,
             'min_child_weight': 3,
@@ -381,7 +381,7 @@ class FlightPriceModel:
         gap = metrics['train_r2'] - metrics['val_r2']
         print(f"\n  Generalization Gap: {gap:.4f}")
         if gap < 0.05:
-            print("   ✓ Good generalization - minimal overfitting")
+            print("   Good generalization - minimal overfitting")
         elif gap < 0.15:
             print("     Moderate overfitting detected")
         else:
@@ -497,18 +497,14 @@ class DeploymentPackage:
 
 
 def main():
-    """
-    Main training pipeline execution.
-    
-    CRITICAL FIX: Data is split BEFORE feature engineering to prevent leakage.
-    """
+
     print("\n" + "="*80)
-    print("🛫 FLIGHT PRICE PREDICTION & INTELLIGENCE SYSTEM v2.0")
+    print("FLIGHT PRICE PREDICTION & INTELLIGENCE SYSTEM v2.0")
     print("   Production-Ready ML Pipeline (LEAKAGE-FREE)")
     print("="*80 + "\n")
     
     # ========== LOAD DATA ==========
-    print("📂 Loading flight data...")
+    print("Loading flight data...")
     df = pd.read_csv('data/all_airlines_cleaned.csv')
     print(f"✓ Loaded {len(df):,} flight records (cleaned data)")
     print(f"✓ Columns: {list(df.columns)}")
@@ -516,11 +512,11 @@ def main():
     
     # ========== CRITICAL FIX: SPLIT BEFORE FEATURE ENGINEERING ==========
     print("="*80)
-    print("🔒 CRITICAL STEP: Splitting data BEFORE feature engineering")
+    print("CRITICAL STEP: Splitting data BEFORE feature engineering")
     print("   This prevents validation data from leaking into training statistics")
     print("="*80 + "\n")
     
-    print("🔀 Splitting data (80% train, 20% validation)...")
+    print("Splitting data (80% train, 20% validation)...")
     
     # Split on the RAW data (before any feature engineering)
     train_df, val_df = train_test_split(
@@ -556,14 +552,14 @@ def main():
     metrics = model_trainer.train(X_train, y_train, X_val, y_val)
     
     # ========== FEATURE IMPORTANCE ==========
-    print("🎯 Analyzing feature importance...")
+    print("Analyzing feature importance...")
     importance_df = model_trainer.get_feature_importance(processor.feature_columns, top_n=15)
     print("\nTop 15 Most Important Features:")
     print(importance_df.to_string(index=False))
     
     # Check for leakage indicators
     print("\n" + "="*60)
-    print("🔍 LEAKAGE DIAGNOSTIC CHECK")
+    print("LEAKAGE DIAGNOSTIC CHECK")
     print("="*60)
     
     stat_features = ['q1', 'median', 'q3', 'mean', 'std']
@@ -573,10 +569,10 @@ def main():
     print(f"Statistical features importance: {total_stat_importance:.2%}")
     
     if total_stat_importance > 0.90:
-        print("❌ WARNING: Statistical features dominate (>90%)")
+        print("WARNING: Statistical features dominate (>90%)")
         print("   This may indicate residual leakage or overfitting")
     elif total_stat_importance > 0.70:
-        print("⚠️  CAUTION: Statistical features are very important (>70%)")
+        print("  CAUTION: Statistical features are very important (>70%)")
         print("   Model relies heavily on historical patterns")
     else:
         print("✓ GOOD: Feature importance is well-distributed")
@@ -594,7 +590,7 @@ def main():
     )
     
     print("="*80)
-    print("🎉 TRAINING PIPELINE COMPLETED SUCCESSFULLY!")
+    print("TRAINING PIPELINE COMPLETED SUCCESSFULLY!")
     print(f"   Deployment package ready at: {package_path}")
     print("   Version: 2.0 (Leakage-Free)")
     print("="*80 + "\n")

@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const mlService = require('../services/mlService');
 
 /**
  * Search for flights based on criteria
@@ -44,6 +45,8 @@ exports.searchFlights = async (req, res) => {
     const flightQuery = `
       SELECT DISTINCT ON (fs.schedule_id, c.class_id)
         fs.schedule_id,
+        fs.flight_number,
+        fs.type_of_plane,
         fs.departure_time,
         fs.duration_minutes,
         al.airline_id,
@@ -81,7 +84,7 @@ exports.searchFlights = async (req, res) => {
     console.log(`Searching flights: dep_id=${dep_id}, arr_id=${arr_id}, departDate=${departDate}`);
     const flightResult = await db.query(flightQuery, [dep_id, arr_id, departDate]);
     console.log(`Query returned ${flightResult.rows.length} flight-class combinations`);
-    
+
     // Debug: Log first few results to check freshness
     if (flightResult.rows.length > 0) {
       console.log(`Sample data freshness:`, flightResult.rows.slice(0, 3).map(r => ({
@@ -112,6 +115,7 @@ exports.searchFlights = async (req, res) => {
       if (!flightsMap.has(scheduleKey)) {
         flightsMap.set(scheduleKey, {
           scheduleId: row.schedule_id,
+          flightNumber: row.flight_number,  // Include flight number
           flightDate: flightDateStr,
           airline: {
             id: row.airline_id,
@@ -877,6 +881,197 @@ exports.getPopularDestinations = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching popular destinations',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * ML Prediction: Analyze flight and get price prediction
+ */
+exports.analyzeFlight = async (req, res) => {
+  try {
+    const {
+      scheduleId,
+      classId,
+      flightDate
+    } = req.body;
+
+    console.log('analyzeFlight called with:', { scheduleId, classId, flightDate });
+
+    // Validate required fields
+    if (!scheduleId || !classId || !flightDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: scheduleId, classId, flightDate'
+      });
+    }
+
+    // Get flight details from database
+    const flightQuery = `
+      SELECT
+        fs.schedule_id,
+        fs.flight_number,
+        fs.departure_time,
+        fs.duration_minutes,
+        al.airline_code,
+        al.airline_name,
+        dep.airport_code as departure_airport,
+        dep.airport_name as departure_airport_name,
+        arr.airport_code as arrival_airport,
+        arr.airport_name as arrival_airport_name,
+        c.class_name,
+        fs.type_of_plane
+      FROM flight_schedules fs
+      INNER JOIN airlines al ON fs.airline_id = al.airline_id
+      INNER JOIN airports dep ON fs.departure_airport_id = dep.airport_id
+      INNER JOIN airports arr ON fs.arrival_airport_id = arr.airport_id
+      INNER JOIN new_classes c ON c.class_id = $2
+      WHERE fs.schedule_id = $1
+        AND fs.is_active = true
+    `;
+
+    const flightResult = await db.query(flightQuery, [scheduleId, classId]);
+
+    if (flightResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Flight not found'
+      });
+    }
+
+    const flight = flightResult.rows[0];
+
+    // Calculate arrival time
+    const arrivalTime = calculateArrivalTime(flight.departure_time, flight.duration_minutes);
+
+    // Prepare data for ML prediction
+    const mlRequestData = {
+      flight_number: flight.flight_number,
+      departure_airport: flight.departure_airport,
+      arrival_airport: flight.arrival_airport,
+      flight_date: flightDate,
+      departure_time: flight.departure_time,
+      arrival_time: arrivalTime,
+      classes: flight.class_name,
+      type_of_plane: flight.type_of_plane || ''
+    };
+
+    console.log('Sending to ML API:', mlRequestData);
+
+    // Call ML service
+    const mlResult = await mlService.predictFlightPrice(mlRequestData);
+
+    if (!mlResult.success) {
+      return res.status(503).json({
+        success: false,
+        message: 'ML prediction service error',
+        error: mlResult.error,
+        details: mlResult.details
+      });
+    }
+
+    // Return combined response
+    res.json({
+      success: true,
+      data: {
+        flight: {
+          scheduleId: flight.schedule_id,
+          flightNumber: flight.flight_number,
+          airline: {
+            code: flight.airline_code,
+            name: flight.airline_name
+          },
+          departure: {
+            airport: flight.departure_airport,
+            name: flight.departure_airport_name,
+            time: flight.departure_time
+          },
+          arrival: {
+            airport: flight.arrival_airport,
+            name: flight.arrival_airport_name,
+            time: arrivalTime
+          },
+          class: flight.class_name,
+          flightDate: flightDate,
+          typeOfPlane: flight.type_of_plane
+        },
+        mlAnalysis: mlResult.data
+      }
+    });
+
+  } catch (error) {
+    console.error('Error analyzing flight:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error analyzing flight',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * ML Prediction: Quick price prediction (minimal analysis)
+ */
+exports.quickPricePredict = async (req, res) => {
+  try {
+    const mlRequestData = req.body;
+
+    // Validate required fields
+    const requiredFields = ['departure_airport', 'arrival_airport', 'flight_date', 'classes'];
+    const missingFields = requiredFields.filter(field => !mlRequestData[field]);
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Missing required fields: ${missingFields.join(', ')}`
+      });
+    }
+
+    console.log('Quick price prediction for:', mlRequestData);
+
+    // Call ML service
+    const mlResult = await mlService.predictFlightPrice(mlRequestData);
+
+    if (!mlResult.success) {
+      return res.status(503).json({
+        success: false,
+        message: 'ML prediction service error',
+        error: mlResult.error
+      });
+    }
+
+    res.json({
+      success: true,
+      data: mlResult.data
+    });
+
+  } catch (error) {
+    console.error('Error in quick price prediction:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error in quick price prediction',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Check ML service health
+ */
+exports.checkMLHealth = async (req, res) => {
+  try {
+    const healthResult = await mlService.healthCheck();
+
+    res.json({
+      success: healthResult.success,
+      data: healthResult.data || { error: healthResult.error }
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error checking ML service health',
       error: error.message
     });
   }

@@ -26,6 +26,11 @@ router.get('/price-chart', flightController.getPriceChartData);
 // Get popular destinations
 router.get('/popular-destinations', flightController.getPopularDestinations);
 
+// ML Prediction endpoints
+router.post('/analyze', flightController.analyzeFlight);
+router.post('/predict', flightController.quickPricePredict);
+router.get('/ml-health', flightController.checkMLHealth);
+
 module.exports = router;
 
 

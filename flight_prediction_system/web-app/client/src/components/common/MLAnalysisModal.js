@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import mlService from '../../services/mlService';
+import AIExplanationPanel from './AIExplanationPanel';
+import AnimatedBuyScore from './AnimatedBuyScore';
 import './MLAnalysisModal.css';
 
 const MLAnalysisModal = ({
@@ -64,13 +66,6 @@ const MLAnalysisModal = ({
       case 'Expensive': return '#ef4444';
       default: return '#6b7280';
     }
-  };
-
-  const getScoreColor = (score) => {
-    if (score >= 80) return '#10b981';
-    if (score >= 60) return '#3b82f6';
-    if (score >= 40) return '#f59e0b';
-    return '#ef4444';
   };
 
   if (!isOpen) return null;
@@ -140,9 +135,11 @@ const MLAnalysisModal = ({
                 <h3>Price Breakdown</h3>
                 <div className="price-breakdown">
                   <div className="breakdown-item">
-                    <span>Base Fare</span>
+                    <span>Fare  </span>
                     <span className="price">{formatPrice(analysis.prediction.base_fare)}</span>
+        
                   </div>
+                 
                   <div className="breakdown-item">
                     <span>VAT (8%)</span>
                     <span className="price">{formatPrice(analysis.prediction.vat)}</span>
@@ -155,6 +152,10 @@ const MLAnalysisModal = ({
                   <div className="breakdown-item total">
                     <span>Total Predicted Price</span>
                     <span className="price">{formatPrice(analysis.prediction.total_price)}</span>
+                  </div>
+                   <div className="breakdown-item">
+                    <span>Fare True </span>
+                    <span className="price">{formatPrice(flightData?.current_price || 0)}</span>
                   </div>
                   <div className="breakdown-formula">
                     <small>Formula: {analysis.prediction.breakdown}</small>
@@ -196,58 +197,10 @@ const MLAnalysisModal = ({
                 )}
               </div>
 
-              {/* Buy Score */}
+              {/* Buy Score - Using New Animated Component */}
               <div className="result-section">
-                <h3>Buy Score</h3>
-                <div className="buy-score-container">
-                  <div className="score-circle" style={{
-                    background: `conic-gradient(${getScoreColor(analysis.buy_score.score)} ${analysis.buy_score.score * 3.6}deg, #e5e7eb 0deg)`
-                  }}>
-                    <div className="score-inner">
-                      <span className="score-value">{analysis.buy_score.score}</span>
-                      <span className="score-max">/100</span>
-                    </div>
-                  </div>
-                  <div className="score-details">
-                    <div className="score-level" style={{ color: getScoreColor(analysis.buy_score.score) }}>
-                      {analysis.buy_score.level}
-                    </div>
-                    <p className="score-recommendation">{analysis.buy_score.recommendation}</p>
-
-                    {analysis.buy_score.breakdown && (
-                      <div className="score-breakdown">
-                        <div className="breakdown-bar">
-                          <span>Price</span>
-                          <div className="bar">
-                            <div className="fill" style={{ width: `${(analysis.buy_score.breakdown.price_competitiveness / 40) * 100}%` }}></div>
-                          </div>
-                          <span>{analysis.buy_score.breakdown.price_competitiveness}/40</span>
-                        </div>
-                        <div className="breakdown-bar">
-                          <span>Timing</span>
-                          <div className="bar">
-                            <div className="fill" style={{ width: `${(analysis.buy_score.breakdown.booking_timing / 30) * 100}%` }}></div>
-                          </div>
-                          <span>{analysis.buy_score.breakdown.booking_timing}/30</span>
-                        </div>
-                        <div className="breakdown-bar">
-                          <span>Risk</span>
-                          <div className="bar">
-                            <div className="fill" style={{ width: `${(analysis.buy_score.breakdown.volatility_risk / 20) * 100}%` }}></div>
-                          </div>
-                          <span>{analysis.buy_score.breakdown.volatility_risk}/20</span>
-                        </div>
-                        <div className="breakdown-bar">
-                          <span>Deal</span>
-                          <div className="bar">
-                            <div className="fill" style={{ width: `${(analysis.buy_score.breakdown.deal_quality / 10) * 100}%` }}></div>
-                          </div>
-                          <span>{analysis.buy_score.breakdown.deal_quality}/10</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <h3>Buy Score {analysis.buy_score.version === 'improved' && <span className="badge-improved">Improved ✨</span>}</h3>
+                <AnimatedBuyScore buyScoreData={analysis.buy_score} />
               </div>
 
               {/* Optimal Booking Time */}
@@ -265,7 +218,7 @@ const MLAnalysisModal = ({
                           <div className="info-item">
                             <span className="label">Best Time to Book</span>
                             <span className="value">
-                              {analysis.optimal_booking.days_from_now === 0 ? 'TODAY' : `${analysis.optimal_booking.days_from_now} days from now`}
+                              {analysis.optimal_booking.days_to_wait === 0 ? 'TODAY' : `${analysis.optimal_booking.days_to_wait} days from now`}
                             </span>
                           </div>
                           <div className="info-item">
@@ -275,7 +228,7 @@ const MLAnalysisModal = ({
                           <div className="info-item highlight">
                             <span className="label">Potential Savings</span>
                             <span className="value savings">
-                              {formatPrice(analysis.optimal_booking.savings_vs_now)} ({analysis.optimal_booking.savings_percent})
+                              {formatPrice(analysis.optimal_booking.savings_vs_now)} ({analysis.optimal_booking.savings_percent}%)
                             </span>
                           </div>
                         </div>
@@ -333,6 +286,12 @@ const MLAnalysisModal = ({
                   <p className="confidence-message">{analysis.confidence.message}</p>
                 </div>
               </div>
+
+              {/* AI Explanation Panel - New Feature */}
+              {/* <div className="result-section">
+                <h3>AI Insights & Recommendations</h3>
+                <AIExplanationPanel analysis={analysis} />
+              </div> */}
             </div>
           )}
         </div>

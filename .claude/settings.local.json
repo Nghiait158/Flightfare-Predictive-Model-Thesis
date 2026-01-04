@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(python buy_score_improved.py:*)",
+      "Bash(python optimal_booking_ml.py:*)",
+      "Bash(python price_trend_ml.py:*)",
+      "Bash(python:*)"
+    ]
+  }
+}

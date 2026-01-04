@@ -847,7 +847,7 @@ const SearchResults = () => {
             {(nearbyDatePrices.length > 0 || loadingNearbyPrices) && (
               <div className="nearby-dates">
                 <div className="nearby-dates__label">
-                  <span className="nearby-dates__icon">📅</span>
+                  {/* <span className="nearby-dates__icon">📅</span> */}
                   <span>Prices for nearby dates</span>
                   {/* {nearbyDatePrices.length === 1 && !loadingNearbyPrices && (
                     <span className="nearby-dates__info">(Only fresh data shown)</span>

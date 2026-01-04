@@ -1,3 +1,15 @@
+# -*- coding: utf-8 -*-
+import sys
+import io
+
+# Fix encoding for Windows console (only if not already wrapped)
+if sys.platform == 'win32' and not isinstance(sys.stdout, io.TextIOWrapper):
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass  # Already wrapped or not available
+
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -14,14 +26,24 @@ from class_mapper import normalize_class_name
 # Import price adjuster
 from price_adjuster import PriceAdjuster
 
+# Import improved buy score calculator
+try:
+    from buy_score_improved import ImprovedBuyScoreCalculator
+    IMPROVED_BUY_SCORE_AVAILABLE = True
+except ImportError:
+    IMPROVED_BUY_SCORE_AVAILABLE = False
+    print("⚠️  Improved Buy Score not available, using standard version")
+
 
 class FlightIntelligenceEngine:
-    def __init__(self, package_dir: str = 'deployment_package', enable_price_adjustment: bool = True):
+    def __init__(self, package_dir: str = 'deployment_package', enable_price_adjustment: bool = True, use_improved_buy_score: bool = True):
         self.package_dir = Path(package_dir)
         self.price_adjuster = PriceAdjuster()
         self.price_adjuster.enabled = enable_price_adjustment
+        self.use_improved_buy_score = use_improved_buy_score and IMPROVED_BUY_SCORE_AVAILABLE
         # Mapping flight_number -> type_of_plane built from training data
         self.plane_map = {}
+        self.improved_buy_score_calculator = None
         self._load_package()
         
     def _load_package(self):
@@ -59,6 +81,16 @@ class FlightIntelligenceEngine:
         print(f"✓ Route statistics loaded: {len(self.route_stats)} combinations")
         print(f"✓ Airlines available: {', '.join(self.metadata['airlines'][:5])}...")
         print(f"✓ Model R² score: {self.metadata['training_metrics']['val_r2']:.4f}")
+
+        # Initialize improved buy score calculator if enabled
+        if self.use_improved_buy_score:
+            try:
+                self.improved_buy_score_calculator = ImprovedBuyScoreCalculator(self.route_stats)
+                print(f"✓ Improved Buy Score Calculator loaded")
+            except Exception as e:
+                print(f"⚠️  Failed to load Improved Buy Score: {e}")
+                self.use_improved_buy_score = False
+
         print("\n" + "="*60 + "\n")
     
     def _extract_airline(self, flight_number: str) -> str:
@@ -241,13 +273,34 @@ class FlightIntelligenceEngine:
             }
         }
     
-    def calculate_buy_score(self, flight_info: Dict[str, Any], 
+    def calculate_buy_score(self, flight_info: Dict[str, Any],
                            predicted_price: float) -> Dict[str, Any]:
-      
+        """
+        Calculate buy score for a flight
+
+        Uses improved calculator if available, falls back to standard method
+        """
         route = f"{flight_info['departure_airport']}_{flight_info['arrival_airport']}"
         airline = self._extract_airline(flight_info.get('flight_number', ''))
         flight_class = flight_info['classes']
         days_to_flight = flight_info['days_to_flight']
+
+        # Use improved buy score if available
+        if self.use_improved_buy_score and self.improved_buy_score_calculator:
+            try:
+                result = self.improved_buy_score_calculator.calculate_buy_score(
+                    flight_info,
+                    predicted_price,
+                    route,
+                    airline,
+                    flight_class
+                )
+                # Add version flag
+                result['version'] = 'improved'
+                return result
+            except Exception as e:
+                print(f"⚠️  Improved buy score failed: {e}, falling back to standard")
+                # Fall through to standard calculation
     
         stats = self.route_stats[
             (self.route_stats['route'] == route) &
@@ -342,6 +395,7 @@ class FlightIntelligenceEngine:
             'level': level,
             'breakdown': scores,
             'recommendation': recommendation,
+            'version': 'standard',
             'factors': {
                 'price_vs_mean': f'{((predicted_price - mean) / mean * 100):+.1f}%',
                 'volatility': f'{(volatility_ratio * 100):.1f}%',

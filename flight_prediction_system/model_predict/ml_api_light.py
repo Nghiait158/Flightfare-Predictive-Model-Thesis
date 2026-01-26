@@ -42,27 +42,27 @@ try:
         enable_price_adjustment=False,
         use_improved_buy_score=True  # Enable improved buy score by default
     )
-    print("✅ ML Engine initialized!")
+    print("ML Engine initialized!")
     if hasattr(engine, 'use_improved_buy_score') and engine.use_improved_buy_score:
-        print("✅ Improved Buy Score ENABLED!")
+        print(" Improved Buy Score ENABLED!")
     else:
-        print("⚠️  Using standard buy score (fallback)")
+        print("  Using standard buy score (fallback)")
 
     # Initialize new modules
     trend_predictor = PriceTrendPredictor(
         route_stats_path='deployment_package/route_statistics.parquet'
     )
-    print("✅ Price Trend Predictor initialized!")
+    print("Price Trend Predictor initialized!")
 
     # Initialize v2 analyzer with current_price support
     optimal_booking = OptimalBookingAnalyzer(
         route_stats_path='deployment_package/route_statistics.parquet'
     )
-    print("✅ Optimal Booking Analyzer V2 initialized!")
-    print(f"✅ Module: {optimal_booking.__class__.__module__}")
+    print(" Optimal Booking Analyzer V2 initialized!")
+    print(f" Module: {optimal_booking.__class__.__module__}")
 
 except Exception as e:
-    print(f"❌ Failed to initialize: {e}")
+    print(f" Failed to initialize: {e}")
     import traceback
     traceback.print_exc()
     engine = None
@@ -140,25 +140,22 @@ def predict_flight_price():
 
         data = request.get_json()
 
-        # ========================================
-        # 🔵 LOG INCOMING REQUEST DATA
-        # ========================================
         print("\n" + "="*80)
-        print("🔵 ML API - INCOMING REQUEST")
-        print("="*80)
-        print(f"📍 Endpoint: /api/predict")
-        print(f"📅 Timestamp: {datetime.now().isoformat()}")
-        print(f"🌐 Request Method: {request.method}")
-        print(f"📨 Request Headers:")
+        print(" ML API - INCOMING REQUEST")
+        # print("="*80)
+        print(f"Endpoint: /api/predict")
+        print(f" Timestamp: {datetime.now().isoformat()}")
+        print(f" Request Method: {request.method}")
+        print(f" Request Headers:")
         for key, value in request.headers:
             if key.lower() not in ['cookie', 'authorization']:  # Skip sensitive headers
                 print(f"   {key}: {value}")
-        print(f"\n📦 Request Body (Raw):")
+        print(f"\n Request Body (Raw):")
         print(f"{data}")
-        print(f"\n📦 Request Body (Formatted JSON):")
+        print(f"\n Request Body (Formatted JSON):")
         import json
         print(json.dumps(data, indent=2, ensure_ascii=False))
-        print("="*80 + "\n")
+        # print("="*80 + "\n")
 
         # Validate required fields
         required_fields = ['departure_airport', 'arrival_airport', 'flight_date', 'classes']
@@ -205,9 +202,9 @@ def predict_flight_price():
         volatility = engine.assess_volatility(route, airline, normalized_class)
 
         # Use new ML-based optimal booking analyzer
-        print(f"\n🔍 DEBUG: optimal_booking is None? {optimal_booking is None}")
+        print(f"\n DEBUG: optimal_booking is None? {optimal_booking is None}")
         if optimal_booking is not None:
-            print(f"🔍 DEBUG: Using OptimalBookingAnalyzer with current_price={prediction_detail['total']}")
+            print(f" DEBUG: Using OptimalBookingAnalyzer with current_price={prediction_detail['total']}")
             optimal_booking_result = optimal_booking.calculate_optimal_booking_time(
                 route=f"{flight_info['departure_airport']}-{flight_info['arrival_airport']}",
                 class_name=normalized_class,
@@ -215,10 +212,10 @@ def predict_flight_price():
                 current_days_before=days_to_flight,
                 current_price=prediction_detail['total']  # Pass actual predicted price
             )
-            print(f"🔍 DEBUG: optimal_booking_result['current_price_estimate'] = {optimal_booking_result.get('current_price_estimate')}")
+            print(f" DEBUG: optimal_booking_result['current_price_estimate'] = {optimal_booking_result.get('current_price_estimate')}")
         else:
             # Fallback to engine's method
-            print(f"🔍 DEBUG: Using fallback engine.find_optimal_booking_time()")
+            print(f" DEBUG: Using fallback engine.find_optimal_booking_time()")
             optimal_booking_result = engine.find_optimal_booking_time(flight_info)
 
         # Add price trend prediction
@@ -453,11 +450,11 @@ def predict_batch():
         # 🔵 LOG INCOMING BATCH REQUEST
         # ========================================
         print("\n" + "="*80)
-        print("🔵 ML API - INCOMING BATCH REQUEST")
+        print("ML API - INCOMING BATCH REQUEST")
         print("="*80)
-        print(f"📍 Endpoint: /api/predict-batch")
-        print(f"📅 Timestamp: {datetime.now().isoformat()}")
-        print(f"📦 Batch Size: {len(flights)} flights")
+        print(f" Endpoint: /api/predict-batch")
+        print(f" Timestamp: {datetime.now().isoformat()}")
+        print(f" Batch Size: {len(flights)} flights")
         print("="*80 + "\n")
 
         start_time = datetime.now()
@@ -622,7 +619,7 @@ def predict_batch():
         # 🟢 LOG OUTGOING BATCH RESPONSE
         # ========================================
         print("\n" + "="*80)
-        print("🟢 ML API - OUTGOING BATCH RESPONSE")
+        print("ML API - OUTGOING BATCH RESPONSE")
         print("="*80)
         print(f"📍 Endpoint: /api/predict-batch")
         print(f"📅 Timestamp: {datetime.now().isoformat()}")

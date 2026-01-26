@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 import joblib
-import json
+import json2
 from pathlib import Path
 from typing import Dict, List, Tuple, Any
 

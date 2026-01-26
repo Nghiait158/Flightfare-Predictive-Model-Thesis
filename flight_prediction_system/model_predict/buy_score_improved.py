@@ -210,23 +210,23 @@ class ImprovedBuyScoreCalculator:
         if total_score >= 80:
             level = 'Excellent'
             recommendation = 'STRONG BUY - Exceptional deal, book immediately!'
-            emoji = '🌟'
+            emoji = ''
         elif total_score >= 65:
             level = 'Good'
             recommendation = 'BUY - Good opportunity, consider booking soon'
-            emoji = '✅'
+            emoji = ''
         elif total_score >= 50:
             level = 'Fair'
             recommendation = 'CONSIDER - Reasonable price, book if convenient'
-            emoji = '👍'
+            emoji = ''
         elif total_score >= 35:
             level = 'Medium'
             recommendation = 'HOLD - Monitor prices, may find better deals'
-            emoji = '⏸️'
+            emoji = ''
         else:
             level = 'Poor'
             recommendation = 'WAIT - Price likely to decrease, hold off'
-            emoji = '⏳'
+            emoji = ''
 
         return {
             'score': int(total_score),

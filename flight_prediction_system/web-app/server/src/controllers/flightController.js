@@ -415,34 +415,65 @@ exports.getCheapestTickets = async (req, res) => {
     // Query to find cheapest flights across available dates
     // Priority: 1. Lowest price, 2. Earliest date, 3. Direct flights
     // IMPORTANT: Only show FRESH data (checked within last 24 hours)
+    // FIX: Get LATEST price per schedule+class+date, then find MIN to match Price Chart logic
     const FRESH_DATA_THRESHOLD_HOURS = 24;
     
     const cheapestQuery = `
-      SELECT DISTINCT ON (fp.flight_date, fs.schedule_id)
-        fs.schedule_id,
-        fs.departure_time,
-        fs.arrival_airport_id,
-        fs.duration_minutes,
-        al.airline_code,
-        al.airline_name,
-        fp.price,
-        fp.currency,
-        fp.flight_date,
-        TO_CHAR(fp.flight_date, 'YYYY-MM-DD') as flight_date_str,
-        fp.checked_at,
-        EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 as hours_old,
-        EXTRACT(DOW FROM fp.flight_date) as day_of_week,
-        TO_CHAR(fp.flight_date, 'Dy, Mon DD') as formatted_date
-      FROM flight_prices fp
-      INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
-      INNER JOIN airlines al ON fs.airline_id = al.airline_id
-      WHERE fs.departure_airport_id = $1
-        AND fs.arrival_airport_id = $2
-        AND fs.is_active = true
-        AND al.is_active = true
-        AND fp.flight_date >= CURRENT_DATE
-        AND EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 <= ${FRESH_DATA_THRESHOLD_HOURS}
-      ORDER BY fp.flight_date, fs.schedule_id, fp.checked_at DESC
+      WITH latest_prices AS (
+        -- Step 1: Get LATEST price for each schedule+class+date combination
+        SELECT DISTINCT ON (fs.schedule_id, fp.class_id, fp.flight_date)
+          fs.schedule_id,
+          fs.departure_time,
+          fs.arrival_airport_id,
+          fs.duration_minutes,
+          al.airline_code,
+          al.airline_name,
+          fp.price,
+          fp.currency,
+          fp.flight_date,
+          TO_CHAR(fp.flight_date, 'YYYY-MM-DD') as flight_date_str,
+          fp.checked_at,
+          EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 as hours_old,
+          EXTRACT(DOW FROM fp.flight_date) as day_of_week,
+          TO_CHAR(fp.flight_date, 'Dy, Mon DD') as formatted_date
+        FROM flight_prices fp
+        INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
+        INNER JOIN airlines al ON fs.airline_id = al.airline_id
+        WHERE fs.departure_airport_id = $1
+          AND fs.arrival_airport_id = $2
+          AND fs.is_active = true
+          AND al.is_active = true
+          AND fp.flight_date >= CURRENT_DATE
+          AND EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 <= ${FRESH_DATA_THRESHOLD_HOURS}
+        ORDER BY fs.schedule_id, fp.class_id, fp.flight_date, fp.checked_at DESC
+      ),
+      -- Step 2: Find MIN price for each date from latest prices
+      cheapest_per_date AS (
+        SELECT 
+          flight_date_str,
+          MIN(price) as min_price
+        FROM latest_prices
+        GROUP BY flight_date_str
+      )
+      -- Step 3: Get the record with cheapest price for each date
+      SELECT DISTINCT ON (lp.flight_date_str)
+        lp.schedule_id,
+        lp.departure_time,
+        lp.arrival_airport_id,
+        lp.duration_minutes,
+        lp.airline_code,
+        lp.airline_name,
+        lp.price,
+        lp.currency,
+        lp.flight_date,
+        lp.flight_date_str,
+        lp.checked_at,
+        lp.hours_old,
+        lp.day_of_week,
+        lp.formatted_date
+      FROM latest_prices lp
+      INNER JOIN cheapest_per_date cpd ON lp.flight_date_str = cpd.flight_date_str AND lp.price = cpd.min_price
+      ORDER BY lp.flight_date_str, lp.checked_at DESC
     `;
 
     const result = await db.query(cheapestQuery, [dep_id, arr_id]);
@@ -636,6 +667,7 @@ exports.getPriceChartData = async (req, res) => {
     // Query to get cheapest price per day
     // Include 3 days before today to show recent price trends
     // IMPORTANT: Only show FRESH data (checked within last 24 hours)
+    // FIX: Use LATEST price per schedule (not MIN of all records) to match Cheapest Tickets logic
     const DAYS_BEFORE = 3;
     const FRESH_DATA_THRESHOLD_HOURS = 24; // Price chart can show slightly older data than search
     
@@ -647,17 +679,14 @@ exports.getPriceChartData = async (req, res) => {
           '1 day'::interval
         )::date as date
       ),
-      cheapest_per_day AS (
-        SELECT 
+      -- Step 1: Get LATEST price for each schedule+class+date combination
+      latest_prices AS (
+        SELECT DISTINCT ON (fs.schedule_id, fp.class_id, fp.flight_date)
           fp.flight_date,
-          MIN(fp.price) as min_price,
-          MAX(fp.currency) as currency,
-          EXTRACT(DOW FROM fp.flight_date) as day_of_week,
-          TO_CHAR(fp.flight_date, 'Day') as day_name,
-          TO_CHAR(fp.flight_date, 'Mon DD') as formatted_date,
-          COUNT(DISTINCT fs.schedule_id) as flight_count,
-          MAX(fp.checked_at) as latest_checked_at,
-          EXTRACT(EPOCH FROM (NOW() - MAX(fp.checked_at)))/3600 as hours_old
+          fp.price,
+          fp.currency,
+          fp.checked_at,
+          fs.schedule_id
         FROM flight_prices fp
         INNER JOIN flight_schedules fs ON fp.schedule_id = fs.schedule_id
         WHERE fs.departure_airport_id = $1
@@ -666,7 +695,22 @@ exports.getPriceChartData = async (req, res) => {
           AND fp.flight_date >= CURRENT_DATE - INTERVAL '${DAYS_BEFORE} days'
           AND fp.flight_date <= CURRENT_DATE + INTERVAL '${parseInt(days)} days'
           AND EXTRACT(EPOCH FROM (NOW() - fp.checked_at))/3600 <= ${FRESH_DATA_THRESHOLD_HOURS}
-        GROUP BY fp.flight_date
+        ORDER BY fs.schedule_id, fp.class_id, fp.flight_date, fp.checked_at DESC
+      ),
+      -- Step 2: Find MIN price from latest prices for each date
+      cheapest_per_day AS (
+        SELECT 
+          flight_date,
+          MIN(price) as min_price,
+          MAX(currency) as currency,
+          EXTRACT(DOW FROM flight_date) as day_of_week,
+          TO_CHAR(flight_date, 'Day') as day_name,
+          TO_CHAR(flight_date, 'Mon DD') as formatted_date,
+          COUNT(DISTINCT schedule_id) as flight_count,
+          MAX(checked_at) as latest_checked_at,
+          EXTRACT(EPOCH FROM (NOW() - MAX(checked_at)))/3600 as hours_old
+        FROM latest_prices
+        GROUP BY flight_date
       )
       SELECT 
         dr.date as flight_date,

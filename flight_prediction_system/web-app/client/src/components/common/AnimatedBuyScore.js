@@ -105,23 +105,18 @@ const AnimatedBuyScore = ({ buyScoreData }) => {
     return 'score-poor';
   };
 
-  /**
-   * Get label for breakdown items
-   */
   const getBreakdownLabel = (key) => {
     const labels = {
-      price_competitiveness: 'Giá cạnh tranh',
-      booking_timing: 'Thời điểm đặt vé',
-      volatility_risk: 'Độ ổn định giá',
-      deal_quality: 'Chất lượng deal',
-      bonus_adjustment: 'Điểm thưởng/Phạt'
+      price_competitiveness: 'Competitive prices',
+      booking_timing: 'Booking time ',
+      volatility_risk: 'Price stability',
+      deal_quality: 'Deal quality',
+      bonus_adjustment: 'Bonus/Penalty Points'
     };
     return labels[key] || key;
   };
 
-  /**
-   * Calculate circle progress path
-   */
+
   const getCircleProgress = () => {
     const radius = 80;
     const circumference = 2 * Math.PI * radius;
@@ -188,7 +183,7 @@ const AnimatedBuyScore = ({ buyScoreData }) => {
         <div className="score-details">
           <div className={`score-level ${getScoreColorClass()}`}>
             {level}
-          </div>
+          </div>+
           <p className="score-recommendation">{recommendation}</p>
 
           {/* Version badge if available */}
@@ -226,7 +221,7 @@ const AnimatedBuyScore = ({ buyScoreData }) => {
                 return (
                   <div key={key} className="breakdown-item">
                     <div className="breakdown-header">
-                      <span className="breakdown-label">
+2                      <span className="breakdown-label">
                         {getBreakdownLabel(key)}
                       </span>
                       <span className="breakdown-score">
